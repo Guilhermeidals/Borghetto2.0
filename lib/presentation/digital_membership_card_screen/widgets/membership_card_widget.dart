@@ -1,23 +1,29 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
 import '../../../theme/app_theme.dart';
 import '../../../widgets/status_badge_widget.dart';
 
-// Anatomy locked: full-width card, member name + tier + card number + QR + expiry
 class MembershipCardWidget extends StatefulWidget {
   final String memberName;
+  final String memberCpf;
+  final String memberPhone;
   final String memberId;
   final String tier;
-  final String expiryDate;
   final int points;
+  final String? photoUrl;
 
   const MembershipCardWidget({
     super.key,
     required this.memberName,
+    required this.memberCpf,
+    required this.memberPhone,
     required this.memberId,
     required this.tier,
-    required this.expiryDate,
     required this.points,
+    this.photoUrl,
   });
 
   @override
@@ -33,17 +39,24 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
   @override
   void initState() {
     super.initState();
+
     _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+
     _scaleAnim = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(parent: _entranceController, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: Curves.easeOutCubic,
+      ),
     );
+
     _fadeAnim = CurvedAnimation(
       parent: _entranceController,
       curve: Curves.easeOutCubic,
     );
+
     _entranceController.forward();
   }
 
@@ -55,13 +68,52 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
 
   BadgeStatus get _tierBadge {
     switch (widget.tier.toLowerCase()) {
+      case 'ativo':
+      case 'active':
+      case 'approved':
       case 'gold':
         return BadgeStatus.gold;
+      case 'pendente':
+      case 'pending':
       case 'silver':
         return BadgeStatus.silver;
+      case 'bloqueado':
+      case 'blocked':
+        return BadgeStatus.bronze;
       default:
         return BadgeStatus.bronze;
     }
+  }
+
+  String get _formattedPoints {
+    return widget.points.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
+  }
+
+  String get _initials {
+    final parts = widget.memberName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) {
+      return 'CB';
+    }
+
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+
+    return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
+        .toUpperCase();
+  }
+
+  bool get _hasPhoto {
+    final photoUrl = widget.photoUrl;
+    return photoUrl != null && photoUrl.trim().isNotEmpty;
   }
 
   @override
@@ -78,7 +130,6 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
           ),
           child: Stack(
             children: [
-              // Decorative circles
               Positioned(
                 top: -30,
                 right: -30,
@@ -92,14 +143,14 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
                 ),
               ),
               Positioned(
-                bottom: -20,
-                left: 40,
+                bottom: -28,
+                left: 34,
                 child: Container(
-                  width: 100,
-                  height: 100,
+                  width: 116,
+                  height: 116,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppTheme.accent.withAlpha(31),
+                    color: AppTheme.accent.withAlpha(28),
                   ),
                 ),
               ),
@@ -108,97 +159,11 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top row: brand + tier badge
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Borghetto',
-                          style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        StatusBadgeWidget(
-                          label: 'Membro ${widget.tier}',
-                          status: _tierBadge,
-                        ),
-                      ],
-                    ),
+                    _buildTopRow(),
                     const SizedBox(height: 24),
-                    // Member name
-                    Text(
-                      widget.memberName,
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Member since May 2024',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: Colors.white.withAlpha(128),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Card number row
-                    Row(
-                      children: [
-                        Text(
-                          _formatCardNumber(widget.memberId),
-                          style: GoogleFonts.outfitTextTheme().bodyMedium
-                              ?.copyWith(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white.withAlpha(204),
-                                letterSpacing: 2,
-                                fontFeatures: [
-                                  const FontFeature.tabularFigures(),
-                                ],
-                              ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Bottom row: QR + expiry + points
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // QR code placeholder (custom drawn)
-                        Container(
-                          width: 80,
-                          height: 80,
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: CustomPaint(painter: _QrPatternPainter()),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _cardInfoRow('Expires', widget.expiryDate),
-                              const SizedBox(height: 8),
-                              _cardInfoRow(
-                                'Points',
-                                widget.points.toString().replaceAllMapped(
-                                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                  (m) => '${m[1]},',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                    _buildIdentityRow(),
+                    const SizedBox(height: 22),
+                    _buildInfoFooter(),
                   ],
                 ),
               ),
@@ -209,67 +174,216 @@ class _MembershipCardWidgetState extends State<MembershipCardWidget>
     );
   }
 
-  Widget _cardInfoRow(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildTopRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          label,
+          'Borghetto',
           style: GoogleFonts.outfit(
-            fontSize: 11,
-            color: Colors.white.withAlpha(128),
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.5,
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.outfit(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: Colors.white,
-            fontFeatures: [const FontFeature.tabularFigures()],
+        StatusBadgeWidget(
+          label: 'Membro ${widget.tier}',
+          status: _tierBadge,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIdentityRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _buildPhotoBox(),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.memberName,
+                style: GoogleFonts.outfit(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                widget.memberCpf,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withAlpha(175),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(
+                    Icons.phone_outlined,
+                    size: 14,
+                    color: Colors.white.withAlpha(170),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.memberPhone,
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withAlpha(190),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
+  Widget _buildPhotoBox() {
+    return Container(
+      width: 86,
+      height: 104,
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(18),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: Colors.white.withAlpha(30),
+          width: 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: _hasPhoto
+            ? Image.network(
+                widget.photoUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildPhotoFallback();
+                },
+              )
+            : _buildPhotoFallback(),
+      ),
+    );
+  }
+
+  Widget _buildPhotoFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF4CAF7D),
+            Color(0xFF2E7D52),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          _initials,
+          style: GoogleFonts.outfit(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoFooter() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 14,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withAlpha(18),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildFooterItem(
+              label: 'Identificação',
+              value: widget.memberId,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 34,
+            color: Colors.white.withAlpha(22),
+          ),
+          Expanded(
+            child: _buildFooterItem(
+              label: 'Pontos',
+              value: _formattedPoints,
+              alignRight: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterItem({
+    required String label,
+    required String value,
+    bool alignRight = false,
+  }) {
+    return Column(
+      crossAxisAlignment:
+          alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withAlpha(130),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: alignRight ? 0 : 0.8,
+            fontFeatures: [
+              const FontFeature.tabularFigures(),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
   String _formatCardNumber(String id) {
-    // Format: SC-2024-00847 → keep as is
     return id;
   }
-}
-
-// Simple QR-like pattern painter for visual representation
-class _QrPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = AppTheme.darkText;
-    final cell = size.width / 8;
-
-    // Draw a simplified QR pattern
-    const pattern = [
-      [1, 1, 1, 1, 1, 1, 1, 0],
-      [1, 0, 0, 0, 0, 0, 1, 0],
-      [1, 0, 1, 1, 1, 0, 1, 0],
-      [1, 0, 1, 0, 1, 0, 1, 1],
-      [1, 0, 1, 1, 1, 0, 1, 0],
-      [1, 0, 0, 0, 0, 0, 1, 1],
-      [1, 1, 1, 1, 1, 1, 1, 0],
-      [0, 1, 0, 1, 0, 1, 0, 1],
-    ];
-
-    for (int row = 0; row < pattern.length; row++) {
-      for (int col = 0; col < pattern[row].length; col++) {
-        if (pattern[row][col] == 1) {
-          canvas.drawRect(
-            Rect.fromLTWH(col * cell, row * cell, cell - 0.5, cell - 0.5),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_QrPatternPainter oldDelegate) => false;
 }

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/api/api_client.dart';
+import '../presentation/access_log_screen/access_log_screen.dart';
 import '../presentation/digital_membership_card_screen/digital_membership_card_screen.dart';
 import '../presentation/home_screen/home_screen.dart';
-import '../presentation/sign_up_login_screen/sign_up_login_screen.dart';
 import '../presentation/profile_screen/profile_screen.dart';
-import '../presentation/access_log_screen/access_log_screen.dart';
+import '../presentation/sign_up_login_screen/sign_up_login_screen.dart';
 import '../widgets/app_scaffold.dart';
 
 class AppRoutes {
@@ -20,6 +21,28 @@ class AppRoutes {
 
 final GoRouter appRouter = GoRouter(
   initialLocation: AppRoutes.initial,
+  redirect: (context, state) async {
+    final token = await ApiClient.instance.getToken();
+
+    final hasToken = token != null && token.isNotEmpty;
+
+    final currentPath = state.uri.path;
+
+    final isInitialRoute = currentPath == AppRoutes.initial;
+    final isLoginRoute = currentPath == AppRoutes.signUpLoginScreen;
+
+    final isPublicRoute = isInitialRoute || isLoginRoute;
+
+    if (!hasToken && !isPublicRoute) {
+      return AppRoutes.signUpLoginScreen;
+    }
+
+    if (hasToken && isPublicRoute) {
+      return AppRoutes.homeScreen;
+    }
+
+    return null;
+  },
   routes: [
     GoRoute(
       path: AppRoutes.initial,

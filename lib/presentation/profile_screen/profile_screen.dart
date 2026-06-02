@@ -1,12 +1,17 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/services.dart';
 
-import '../../theme/app_theme.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
+import '../../core/api/auth_session.dart';
 import '../../routes/app_routes.dart';
+import '../../theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,6 +23,170 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   XFile? _profilePhoto;
   final ImagePicker _picker = ImagePicker();
+
+  AuthSession? _session;
+
+  bool _isLoadingSession = true;
+  bool _isUploadingPhoto = false;
+  bool _isSavingProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    try {
+      final session = await ApiClient.instance.getSavedSession();
+
+      if (!mounted) return;
+
+      setState(() {
+        _session = session;
+        _isLoadingSession = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingSession = false;
+      });
+
+      _showSnackBar(
+        'Não foi possível carregar os dados do perfil.',
+        isError: true,
+      );
+    }
+  }
+
+  String get _displayName {
+    final name = _session?.name.trim();
+
+    if (name == null || name.isEmpty) {
+      return 'Cliente Borghetto';
+    }
+
+    return name;
+  }
+
+  String get _displayEmail {
+    final email = _session?.email?.trim();
+
+    if (email == null || email.isEmpty) {
+      return 'E-mail não informado';
+    }
+
+    return email;
+  }
+
+  String get _displayCpf {
+    final cpf = _session?.cpf?.trim();
+
+    if (cpf == null || cpf.isEmpty) {
+      return 'CPF não informado';
+    }
+
+    return cpf;
+  }
+
+  String get _displayPhone {
+    final phone = _session?.phone?.trim();
+
+    if (phone == null || phone.isEmpty) {
+      return 'Telefone não informado';
+    }
+
+    return phone;
+  }
+
+  String get _initials {
+    final parts = _displayName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (parts.isEmpty) {
+      return 'CB';
+    }
+
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+
+    return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
+        .toUpperCase();
+  }
+
+  String _onlyDigits(String value) {
+    return value.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  String _formatPhone(String value) {
+    final digits = _onlyDigits(value);
+
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 2) {
+      return '(${digits}';
+    }
+
+    final ddd = digits.substring(0, 2);
+    final number = digits.substring(2);
+
+    if (number.length <= 4) {
+      return '($ddd) $number';
+    }
+
+    if (digits.length <= 10) {
+      final firstPart = number.substring(0, number.length - 4);
+      final lastPart = number.substring(number.length - 4);
+      return '($ddd) $firstPart-$lastPart';
+    }
+
+    final firstPart = number.substring(0, 5);
+    final lastPart = number.substring(5, 9);
+    return '($ddd) $firstPart-$lastPart';
+  }
+
+  String? get _serverPhotoUrl {
+    final facialUserId = _session?.controlIdUserId;
+
+    if (facialUserId == null || facialUserId <= 0) {
+      return null;
+    }
+
+    final url = ApiClient.instance.resolveFileUrl(
+      '/facial/users/$facialUserId/face',
+    );
+
+    if (url.isEmpty) {
+      return null;
+    }
+
+    return url;
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.outfit(fontSize: 13),
+        ),
+        backgroundColor: isError ? AppTheme.error : AppTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
 
   Future<void> _showPhotoOptions() async {
     showModalBottomSheet(
@@ -34,7 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Profile Photo',
+                'Foto do perfil',
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -61,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 12),
               _buildPhotoOption(
                 icon: Icons.photo_library_outlined,
-                label: 'Escolher da Galeria',
+                label: 'Escolher da galeria',
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.gallery);
@@ -75,7 +244,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: AppTheme.error,
                   onTap: () {
                     Navigator.pop(ctx);
-                    setState(() => _profilePhoto = null);
+                    setState(() {
+                      _profilePhoto = null;
+                    });
                   },
                 ),
               ],
@@ -94,6 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Color? color,
   }) {
     final c = color ?? AppTheme.darkText;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.0),
@@ -125,34 +297,352 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 92,
       );
-      if (image != null) {
-        setState(() => _profilePhoto = image);
+
+      if (image == null) {
+        return;
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Não foi possível acessar a ${source == ImageSource.camera ? 'câmera' : 'galeria'}. Por favor verifique as permições.',
-              style: GoogleFonts.outfit(fontSize: 13),
+
+      setState(() {
+        _profilePhoto = image;
+      });
+
+      await _uploadProfilePhoto(image);
+    } catch (_) {
+      _showSnackBar(
+        'Não foi possível acessar a ${source == ImageSource.camera ? 'câmera' : 'galeria'}. Verifique as permissões.',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _uploadProfilePhoto(XFile image) async {
+  final session = _session;
+
+  if (session == null || session.userId <= 0) {
+    _showSnackBar(
+      'Sessão não encontrada. Faça login novamente.',
+      isError: true,
+    );
+    return;
+  }
+
+  final facialUserId = session.controlIdUserId;
+
+  if (facialUserId == null || facialUserId <= 0) {
+    _showSnackBar(
+      'Usuário ainda não possui ID facial vinculado.',
+      isError: true,
+    );
+    return;
+  }
+
+  if (kIsWeb) {
+    _showSnackBar(
+      'Envio de foto pela Web ainda não está habilitado.',
+      isError: true,
+    );
+    return;
+  }
+
+  setState(() {
+    _isUploadingPhoto = true;
+  });
+
+  try {
+    final updatedSession = await ApiClient.instance.uploadSelfie(
+      facialUserId: facialUserId,
+      imageFile: File(image.path),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _session = updatedSession;
+      _profilePhoto = null;
+    });
+
+    _showSnackBar('Foto enviada com sucesso.');
+  } on ApiException catch (e) {
+    _showSnackBar(e.message, isError: true);
+  } catch (_) {
+    _showSnackBar(
+      'Erro inesperado ao enviar a foto.',
+      isError: true,
+    );
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isUploadingPhoto = false;
+      });
+    }
+  }
+}
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Sair da conta'),
+          content: const Text('Deseja realmente sair da sua conta?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
             ),
-            backgroundColor: AppTheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Sair'),
             ),
-          ),
+          ],
         );
-      }
+      },
+    );
+
+    if (shouldLogout != true) {
+      return;
+    }
+
+    await ApiClient.instance.logout();
+
+    if (!mounted) return;
+
+    context.go(AppRoutes.signUpLoginScreen);
+  }
+
+  Future<void> _showEditProfileDialog() async {
+    final session = _session;
+
+    if (session == null) {
+      _showSnackBar(
+        'Sessão não encontrada. Faça login novamente.',
+        isError: true,
+      );
+      return;
+    }
+
+    final nameController = TextEditingController(text: session.name);
+    final cpfController = TextEditingController(text: session.cpf ?? '');
+    final phoneController = TextEditingController(text: _formatPhone(session.phone ?? ''),);
+    final emailController = TextEditingController(text: session.email ?? '');
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('Editar perfil'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Nome',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Informe seu nome';
+                          }
+
+                          if (value.trim().length < 3) {
+                            return 'Informe um nome válido';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: cpfController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'CPF',
+                        ),
+                        validator: (value) {
+                          final cpf = _onlyDigits(value ?? '');
+
+                          if (cpf.isEmpty) {
+                            return 'Informe seu CPF';
+                          }
+
+                          if (cpf.length != 11) {
+                            return 'O CPF precisa ter 11 números';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                          _PhoneInputFormatter(),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Telefone',
+                        ),
+                        validator: (value) {
+                          final phone = _onlyDigits(value ?? '');
+
+                          if (phone.isEmpty) {
+                            return 'Informe seu telefone';
+                          }
+
+                          if (phone.length < 10 || phone.length > 11) {
+                            return 'Informe um telefone válido';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'E-mail',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Informe seu e-mail';
+                          }
+
+                          final emailRegex =
+                              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+                          if (!emailRegex.hasMatch(value.trim())) {
+                            return 'Informe um e-mail válido';
+                          }
+
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _isSavingProfile
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: _isSavingProfile
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            _isSavingProfile = true;
+                          });
+
+                          await _saveProfile(
+                            userId: session.userId,
+                            name: nameController.text.trim(),
+                            cpf: _onlyDigits(cpfController.text.trim()),
+                            phone: _onlyDigits(phoneController.text.trim()),
+                            email: emailController.text.trim(),
+                          );
+
+                          if (!mounted) return;
+
+                          setDialogState(() {
+                            _isSavingProfile = false;
+                          });
+
+                          if (Navigator.of(dialogContext).canPop()) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        },
+                  child: _isSavingProfile
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    cpfController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+
+    if (mounted) {
+      setState(() {
+        _isSavingProfile = false;
+      });
+    }
+  }
+
+  Future<void> _saveProfile({
+    required int userId,
+    required String name,
+    required String cpf,
+    required String phone,
+    required String email,
+  }) async {
+    try {
+      final updatedSession = await ApiClient.instance.updateUser(
+        userId: userId,
+        name: name,
+        cpf: cpf,
+        phone: phone,
+        email: email,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _session = updatedSession;
+      });
+
+      _showSnackBar('Perfil atualizado com sucesso.');
+    } on ApiException catch (e) {
+      _showSnackBar(e.message, isError: true);
+    } catch (_) {
+      _showSnackBar(
+        'Erro inesperado ao atualizar o perfil.',
+        isError: true,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingSession) {
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundLight,
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundLight,
       body: SafeArea(
@@ -177,7 +667,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Profile',
+            'Perfil',
             style: GoogleFonts.outfit(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -185,7 +675,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           GestureDetector(
-            onTap: () {},
+            onTap: _showEditProfileDialog,
             child: Container(
               width: 36,
               height: 36,
@@ -218,7 +708,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Row(
           children: [
             GestureDetector(
-              onTap: _showPhotoOptions,
+              onTap: _isUploadingPhoto ? null : _showPhotoOptions,
               child: Stack(
                 children: [
                   Container(
@@ -235,35 +725,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: _profilePhoto != null ? Colors.transparent : null,
                       borderRadius: BorderRadius.circular(20.0),
                     ),
-                    child: _profilePhoto != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(20.0),
-                            child: kIsWeb
-                                ? Image.network(
-                                    _profilePhoto!.path,
-                                    width: 64,
-                                    height: 64,
-                                    fit: BoxFit.cover,
-                                    semanticLabel: 'Profile photo of Maya Chen',
-                                  )
-                                : Image.file(
-                                    File(_profilePhoto!.path),
-                                    width: 64,
-                                    height: 64,
-                                    fit: BoxFit.cover,
-                                    semanticLabel: 'Profile photo of Maya Chen',
-                                  ),
-                          )
-                        : Center(
-                            child: Text(
-                              'MC',
-                              style: GoogleFonts.outfit(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                    child: _buildAvatarContent(),
                   ),
                   Positioned(
                     bottom: 0,
@@ -276,11 +738,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(8.0),
                         border: Border.all(color: Colors.white, width: 2),
                       ),
-                      child: const Icon(
-                        Icons.camera_alt_rounded,
-                        size: 11,
-                        color: Colors.white,
-                      ),
+                      child: _isUploadingPhoto
+                          ? const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 11,
+                              color: Colors.white,
+                            ),
                     ),
                   ),
                 ],
@@ -292,16 +762,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Maya Chen',
+                    _displayName,
                     style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.darkText,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'maya.chen@borghetto.com',
+                    _displayEmail,
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       color: AppTheme.mutedText,
@@ -328,11 +799,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Gold Member',
+                          'Cliente Borghetto',
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFE8A020),
+                            color: const Color(0xFFE8A020),
                           ),
                         ),
                       ],
@@ -342,7 +813,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: _showEditProfileDialog,
               child: Container(
                 width: 32,
                 height: 32,
@@ -363,6 +834,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildAvatarContent() {
+    if (_profilePhoto != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20.0),
+        child: kIsWeb
+            ? Image.network(
+                _profilePhoto!.path,
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+                semanticLabel: 'Foto de perfil de $_displayName',
+              )
+            : Image.file(
+                File(_profilePhoto!.path),
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+                semanticLabel: 'Foto de perfil de $_displayName',
+              ),
+      );
+    }
+
+    if (_serverPhotoUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(20.0),
+        child: Image.network(
+          _serverPhotoUrl!,
+          width: 64,
+          height: 64,
+          fit: BoxFit.cover,
+          semanticLabel: 'Foto de perfil de $_displayName',
+          errorBuilder: (context, error, stackTrace) {
+            return _buildInitialsAvatar();
+          },
+        ),
+      );
+    }
+
+    return _buildInitialsAvatar();
+  }
+
+  Widget _buildInitialsAvatar() {
+    return Center(
+      child: Text(
+        _initials,
+        style: GoogleFonts.outfit(
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
   Widget _buildStatsRow(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -370,8 +895,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Expanded(
             child: _buildStatCard(
-              '2,847',
-              'Points',
+              '0',
+              'Pontos',
               Icons.stars_rounded,
               AppTheme.accent,
             ),
@@ -379,8 +904,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '14',
-              'Visits',
+              '0',
+              'Visitas',
               Icons.storefront_outlined,
               AppTheme.primary,
             ),
@@ -388,10 +913,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _buildStatCard(
-              '\$342',
-              'Saved',
+              'R\$ 0',
+              'Economia',
               Icons.savings_outlined,
-              Color(0xFFE8A020),
+              const Color(0xFFE8A020),
             ),
           ),
         ],
@@ -426,7 +951,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           Text(
             label,
-            style: GoogleFonts.outfit(fontSize: 11, color: AppTheme.mutedText),
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              color: AppTheme.mutedText,
+            ),
           ),
         ],
       ),
@@ -437,44 +965,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final menuItems = [
       {
         'icon': Icons.history_rounded,
-        'label': 'Access Log History',
-        'subtitle': 'View door access records',
+        'label': 'Histórico de acesso',
+        'subtitle': 'Veja os registros de acesso',
         'onTap': () => context.push(AppRoutes.accessLogScreen),
         'accent': true,
       },
       {
         'icon': Icons.credit_card_outlined,
-        'label': 'Membership Card',
-        'subtitle': 'View your digital card',
+        'label': 'Carteirinha digital',
+        'subtitle': 'Veja seu cartão de membro',
         'onTap': () => context.go(AppRoutes.digitalMembershipCardScreen),
         'accent': false,
       },
       {
-        'icon': Icons.notifications_outlined,
-        'label': 'Notifications',
-        'subtitle': 'Manage alert preferences',
-        'onTap': () {},
+        'icon': Icons.person_outline_rounded,
+        'label': 'Dados do perfil',
+        'subtitle': 'Nome, CPF, telefone e e-mail',
+        'onTap': _showEditProfileDialog,
         'accent': false,
       },
       {
         'icon': Icons.lock_outline_rounded,
-        'label': 'Privacy & Security',
-        'subtitle': 'Password, biometrics',
+        'label': 'Privacidade e segurança',
+        'subtitle': 'Senha e biometria',
         'onTap': () {},
         'accent': false,
       },
       {
         'icon': Icons.help_outline_rounded,
-        'label': 'Help & Support',
-        'subtitle': 'FAQs and contact us',
+        'label': 'Ajuda e suporte',
+        'subtitle': 'Dúvidas e contato',
         'onTap': () {},
         'accent': false,
       },
       {
         'icon': Icons.logout_rounded,
-        'label': 'Sign Out',
-        'subtitle': 'Log out of your account',
-        'onTap': () => context.go(AppRoutes.signUpLoginScreen),
+        'label': 'Sair',
+        'subtitle': 'Encerrar sessão da conta',
+        'onTap': _confirmLogout,
         'accent': false,
         'danger': true,
       },
@@ -486,7 +1014,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Account',
+            'Conta',
             style: GoogleFonts.outfit(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -509,8 +1037,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 final color = isDanger
                     ? AppTheme.error
                     : isAccent
-                    ? AppTheme.accent
-                    : AppTheme.darkText;
+                        ? AppTheme.accent
+                        : AppTheme.darkText;
 
                 return Column(
                   children: [
@@ -531,8 +1059,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 color: isDanger
                                     ? AppTheme.error.withAlpha(20)
                                     : isAccent
-                                    ? AppTheme.accentLight
-                                    : AppTheme.surfaceVariantLight,
+                                        ? AppTheme.accentLight
+                                        : AppTheme.surfaceVariantLight,
                                 borderRadius: BorderRadius.circular(10.0),
                               ),
                               child: Icon(
@@ -588,6 +1116,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+class _PhoneInputFormatter extends TextInputFormatter {
+  String _onlyDigits(String value) {
+    return value.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  String _formatPhone(String value) {
+    final digits = _onlyDigits(value);
+
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 2) {
+      return '(${digits}';
+    }
+
+    final ddd = digits.substring(0, 2);
+    final number = digits.substring(2);
+
+    if (number.length <= 4) {
+      return '($ddd) $number';
+    }
+
+    if (digits.length <= 10) {
+      final firstPart = number.substring(0, number.length - 4);
+      final lastPart = number.substring(number.length - 4);
+      return '($ddd) $firstPart-$lastPart';
+    }
+
+    final firstPart = number.substring(0, 5);
+    final lastPart = number.substring(5, 9);
+    return '($ddd) $firstPart-$lastPart';
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = _onlyDigits(newValue.text);
+    final limitedDigits =
+        digits.length > 11 ? digits.substring(0, 11) : digits;
+
+    final formatted = _formatPhone(limitedDigits);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

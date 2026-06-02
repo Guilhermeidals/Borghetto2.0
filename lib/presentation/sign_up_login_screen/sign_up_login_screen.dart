@@ -15,7 +15,6 @@ class SignUpLoginScreen extends StatefulWidget {
 
 class _SignUpLoginScreenState extends State<SignUpLoginScreen>
     with TickerProviderStateMixin {
-  // TODO: Replace with [Riverpod/Bloc] for production
   bool _showForm = false;
   bool _isLogin = true;
 
@@ -26,17 +25,23 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   @override
   void initState() {
     super.initState();
+
     _formSlideController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
+
     _formSlideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(
+        Tween<Offset>(
+          begin: const Offset(0, 0.08),
+          end: Offset.zero,
+        ).animate(
           CurvedAnimation(
             parent: _formSlideController,
             curve: Curves.easeOutCubic,
           ),
         );
+
     _formFadeAnimation = CurvedAnimation(
       parent: _formSlideController,
       curve: Curves.easeOutCubic,
@@ -50,7 +55,10 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   }
 
   void _handleGetStarted() {
-    setState(() => _showForm = true);
+    setState(() {
+      _showForm = true;
+    });
+
     _formSlideController.forward();
   }
 
@@ -59,7 +67,9 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   }
 
   void _toggleMode() {
-    setState(() => _isLogin = !_isLogin);
+    setState(() {
+      _isLogin = !_isLogin;
+    });
   }
 
   @override
@@ -78,7 +88,6 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   Widget _buildPhoneLayout() {
     return Stack(
       children: [
-        // Hero section always visible
         AnimatedPositioned(
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeOutCubic,
@@ -91,7 +100,6 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
             onGetStarted: _handleGetStarted,
           ),
         ),
-        // Form slides up from bottom
         if (_showForm)
           Positioned(
             bottom: 0,
