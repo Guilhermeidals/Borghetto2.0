@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -44,6 +45,8 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _rememberMe = false;
+  bool _isSearchingZipCode = false;
+  String? _lastSearchedZipCode;
 
   @override
   void dispose() {
@@ -222,6 +225,62 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
   String _onlyDigits(String value) {
     return value.replaceAll(RegExp(r'[^0-9]'), '');
+  }
+
+  Future<void> _searchZipCode(String value) async {
+    final zipCode = _onlyDigits(value);
+
+    if (zipCode.length != 8) return;
+    if (_isSearchingZipCode) return;
+    if (_lastSearchedZipCode == zipCode) return;
+
+    setState(() {
+      _isSearchingZipCode = true;
+      _lastSearchedZipCode = zipCode;
+    });
+
+    try {
+      final dio = Dio();
+
+      final response = await dio.get(
+        'https://viacep.com.br/ws/$zipCode/json/',
+        options: Options(
+          sendTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 8),
+        ),
+      );
+
+      final data = response.data;
+
+      if (data is! Map<String, dynamic>) {
+        await _showError('Não foi possível consultar o CEP.');
+        return;
+      }
+
+      if (data['erro'] == true) {
+        await _showError('CEP não encontrado.');
+        return;
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _streetController.text = data['logradouro']?.toString() ?? '';
+        _neighborhoodController.text = data['bairro']?.toString() ?? '';
+        _cityController.text = data['localidade']?.toString() ?? '';
+        _stateController.text = data['uf']?.toString() ?? '';
+      });
+    } on DioException {
+      await _showError('Não foi possível consultar o CEP agora.');
+    } catch (_) {
+      await _showError('Erro inesperado ao consultar CEP.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSearchingZipCode = false;
+        });
+      }
+    }
   }
 
   String _formatBirthDateToApi(String value) {
@@ -477,6 +536,28 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   inputFormatters: [
                     _CepInputFormatter(),
                   ],
+                  suffixIcon: _isSearchingZipCode
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : null,
+                  onChanged: (value) {
+                    final zipCode = _onlyDigits(value);
+
+                    if (zipCode.length < 8) {
+                      _lastSearchedZipCode = null;
+                      return;
+                    }
+
+                    if (zipCode.length == 8) {
+                      _searchZipCode(value);
+                    }
+                  },
                   validator: (v) {
                     final zipCode = _onlyDigits(v ?? '');
 
@@ -916,6 +997,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
     TextInputType? keyboardType,
     TextInputAction? textInputAction,
     void Function(String)? onFieldSubmitted,
+    void Function(String)? onChanged,
     String? Function(String?)? validator,
     List<TextInputFormatter>? inputFormatters,
   }) {
@@ -925,6 +1007,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       onFieldSubmitted: onFieldSubmitted,
+      onChanged: onChanged,
       inputFormatters: inputFormatters,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       enabled: !_isLoading,
