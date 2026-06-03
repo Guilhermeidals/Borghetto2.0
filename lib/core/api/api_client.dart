@@ -118,8 +118,16 @@ class ApiClient {
     required String name,
     required String cpf,
     required String phone,
+    required String birthDate,
     required String email,
     required String password,
+    required String zipCode,
+    required String street,
+    required String number,
+    String? complement,
+    required String neighborhood,
+    required String city,
+    required String state,
   }) async {
     try {
       final response = await _dio.post(
@@ -128,8 +136,16 @@ class ApiClient {
           'name': name.trim(),
           'cpf': _onlyDigits(cpf),
           'phone': _onlyDigits(phone),
+          'birth_date': birthDate.trim(),
           'email': email.trim(),
           'password': password,
+          'zip_code': _onlyDigits(zipCode),
+          'street': street.trim(),
+          'number': number.trim(),
+          'complement': complement?.trim(),
+          'neighborhood': neighborhood.trim(),
+          'city': city.trim(),
+          'state': state.trim().toUpperCase(),
         },
       );
 

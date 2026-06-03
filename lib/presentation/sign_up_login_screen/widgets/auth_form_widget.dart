@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -31,6 +32,14 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
   final _nameController = TextEditingController();
   final _cpfController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _birthDateController = TextEditingController();
+  final _zipCodeController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _numberController = TextEditingController();
+  final _complementController = TextEditingController();
+  final _neighborhoodController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _stateController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -43,6 +52,14 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
     _nameController.dispose();
     _cpfController.dispose();
     _phoneController.dispose();
+    _birthDateController.dispose();
+    _zipCodeController.dispose();
+    _streetController.dispose();
+    _numberController.dispose();
+    _complementController.dispose();
+    _neighborhoodController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
     super.dispose();
   }
 
@@ -132,10 +149,29 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
   Future<void> _handleRegister() async {
     final name = _nameController.text.trim();
-    final cpf = _cpfController.text.trim();
-    final phone = _phoneController.text.trim();
+    final cpf = _onlyDigits(_cpfController.text);
+    final phone = _onlyDigits(_phoneController.text);
+    final birthDate = _formatBirthDateToApi(_birthDateController.text);
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+
+    final zipCode = _onlyDigits(_zipCodeController.text);
+    final street = _streetController.text.trim();
+    final number = _numberController.text.trim();
+    final complement = _complementController.text.trim();
+    final neighborhood = _neighborhoodController.text.trim();
+    final city = _cityController.text.trim();
+    final state = _stateController.text.trim().toUpperCase();
+
+    if (!_isValidCpf(cpf)) {
+      await _showError('CPF inválido. Verifique o número informado.');
+      return;
+    }
+
+    if (!_isValidBirthDate(_birthDateController.text)) {
+      await _showError('Data de nascimento inválida.');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -146,8 +182,16 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
         name: name,
         cpf: cpf,
         phone: phone,
+        birthDate: birthDate,
         email: email,
         password: password,
+        zipCode: zipCode,
+        street: street,
+        number: number,
+        complement: complement.isEmpty ? null : complement,
+        neighborhood: neighborhood,
+        city: city,
+        state: state,
       );
 
       await _showSuccess('Cadastro realizado com sucesso.');
@@ -179,6 +223,76 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
   String _onlyDigits(String value) {
     return value.replaceAll(RegExp(r'[^0-9]'), '');
   }
+
+  String _formatBirthDateToApi(String value) {
+    final digits = _onlyDigits(value);
+
+    if (digits.length != 8) return '';
+
+    final day = digits.substring(0, 2);
+    final month = digits.substring(2, 4);
+    final year = digits.substring(4, 8);
+
+    return '$year-$month-$day';
+  }
+
+  bool _isValidBirthDate(String value) {
+    final digits = _onlyDigits(value);
+
+    if (digits.length != 8) return false;
+
+    final day = int.tryParse(digits.substring(0, 2));
+    final month = int.tryParse(digits.substring(2, 4));
+    final year = int.tryParse(digits.substring(4, 8));
+
+    if (day == null || month == null || year == null) return false;
+
+    final now = DateTime.now();
+
+    if (year < 1900 || year > now.year) return false;
+    if (month < 1 || month > 12) return false;
+    if (day < 1 || day > 31) return false;
+
+    final parsed = DateTime(year, month, day);
+
+    if (parsed.year != year || parsed.month != month || parsed.day != day) {
+      return false;
+    }
+
+    if (parsed.isAfter(now)) return false;
+
+    return true;
+  }
+
+  bool _isValidCpf(String value) {
+  final cpf = _onlyDigits(value);
+
+  if (cpf.length != 11) return false;
+
+  if (RegExp(r'^(\d)\1{10}$').hasMatch(cpf)) return false;
+
+  final digits = cpf.split('').map(int.parse).toList();
+
+  var sum = 0;
+  for (var i = 0; i < 9; i++) {
+    sum += digits[i] * (10 - i);
+  }
+
+  var firstCheckDigit = 11 - (sum % 11);
+  if (firstCheckDigit >= 10) firstCheckDigit = 0;
+
+  if (digits[9] != firstCheckDigit) return false;
+
+  sum = 0;
+  for (var i = 0; i < 10; i++) {
+    sum += digits[i] * (11 - i);
+  }
+
+  var secondCheckDigit = 11 - (sum % 11);
+  if (secondCheckDigit >= 10) secondCheckDigit = 0;
+
+  return digits[10] == secondCheckDigit;
+}
 
   void _handleToggleMode() {
     _formKey.currentState?.reset();
@@ -275,6 +389,9 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   icon: Icons.badge_outlined,
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    _CpfInputFormatter(),
+                  ],
                   validator: (v) {
                     final cpf = _onlyDigits(v ?? '');
 
@@ -284,6 +401,10 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
                     if (cpf.length != 11) {
                       return 'O CPF precisa ter 11 números';
+                    }
+
+                    if (!_isValidCpf(cpf)) {
+                      return 'Informe um CPF válido';
                     }
 
                     return null;
@@ -299,6 +420,9 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   icon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    _PhoneInputFormatter(),
+                  ],
                   validator: (v) {
                     final phone = _onlyDigits(v ?? '');
 
@@ -306,8 +430,10 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                       return 'Insira seu telefone';
                     }
 
-                    if (phone.length < 10 || phone.length > 11) {
-                      return 'Informe um telefone válido';
+                    final phoneRegex = RegExp(r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$');
+
+                    if (!phoneRegex.hasMatch(phone)) {
+                      return 'Informe DDD + telefone válido';
                     }
 
                     return null;
@@ -315,6 +441,168 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                 ),
 
                 const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _birthDateController,
+                  label: 'Data de nascimento',
+                  hint: 'DD/MM/AAAA',
+                  icon: Icons.calendar_today_outlined,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    _BirthDateInputFormatter(),
+                  ],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Insira sua data de nascimento';
+                    }
+
+                    if (!_isValidBirthDate(v)) {
+                      return 'Informe uma data válida';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _zipCodeController,
+                  label: 'CEP',
+                  hint: '12345-678',
+                  icon: Icons.location_on_outlined,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    _CepInputFormatter(),
+                  ],
+                  validator: (v) {
+                    final zipCode = _onlyDigits(v ?? '');
+
+                    if (zipCode.isEmpty) {
+                      return 'Insira seu CEP';
+                    }
+
+                    if (zipCode.length != 8) {
+                      return 'O CEP precisa ter 8 números';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _streetController,
+                  label: 'Rua',
+                  hint: 'Nome da rua',
+                  icon: Icons.route_outlined,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Insira sua rua';
+                    }
+
+                    if (v.trim().length < 3) {
+                      return 'Informe uma rua válida';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _numberController,
+                  label: 'Número',
+                  hint: 'Número da residência',
+                  icon: Icons.home_outlined,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(20),
+                  ],
+                  validator: (v) {
+                    final number = _onlyDigits(v ?? '');
+
+                    if (number.isEmpty) {
+                      return 'Insira o número';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _complementController,
+                  label: 'Complemento',
+                  hint: 'Apartamento, bloco, casa, referência...',
+                  icon: Icons.maps_home_work_outlined,
+                  textInputAction: TextInputAction.next,
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _neighborhoodController,
+                  label: 'Bairro',
+                  hint: 'Nome do bairro',
+                  icon: Icons.location_city_outlined,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Insira seu bairro';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _cityController,
+                  label: 'Cidade',
+                  hint: 'Nome da cidade',
+                  icon: Icons.apartment_outlined,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Insira sua cidade';
+                    }
+
+                    return null;
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildUnderlineField(
+                  controller: _stateController,
+                  label: 'UF',
+                  hint: 'RS',
+                  icon: Icons.flag_outlined,
+                  textInputAction: TextInputAction.next,
+                  validator: (v) {
+                    final state = v?.trim().toUpperCase() ?? '';
+
+                    if (state.isEmpty) {
+                      return 'Insira a UF';
+                    }
+
+                    if (state.length != 2) {
+                      return 'Informe a UF com 2 letras';
+                    }
+
+                    return null;
+                  },
+                ),
               ],
 
               _buildUnderlineField(
@@ -629,6 +917,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
     TextInputAction? textInputAction,
     void Function(String)? onFieldSubmitted,
     String? Function(String?)? validator,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
@@ -636,6 +925,8 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       onFieldSubmitted: onFieldSubmitted,
+      inputFormatters: inputFormatters,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       enabled: !_isLoading,
       style: GoogleFonts.outfit(
         fontSize: 15,
@@ -698,6 +989,123 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
           horizontal: 0,
         ),
       ),
+    );
+  }
+}
+
+class _CpfInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length > 11) {
+      digits = digits.substring(0, 11);
+    }
+
+    var formatted = digits;
+
+    if (digits.length > 9) {
+      formatted =
+          '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}';
+    } else if (digits.length > 6) {
+      formatted =
+          '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6)}';
+    } else if (digits.length > 3) {
+      formatted = '${digits.substring(0, 3)}.${digits.substring(3)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length > 11) {
+      digits = digits.substring(0, 11);
+    }
+
+    var formatted = digits;
+
+    if (digits.length >= 11) {
+      formatted =
+          '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
+    } else if (digits.length > 6) {
+      formatted =
+          '(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6)}';
+    } else if (digits.length > 2) {
+      formatted = '(${digits.substring(0, 2)}) ${digits.substring(2)}';
+    } else if (digits.isNotEmpty) {
+      formatted = '($digits';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _BirthDateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length > 8) {
+      digits = digits.substring(0, 8);
+    }
+
+    var formatted = digits;
+
+    if (digits.length > 4) {
+      formatted =
+          '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4)}';
+    } else if (digits.length > 2) {
+      formatted = '${digits.substring(0, 2)}/${digits.substring(2)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+class _CepInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.length > 8) {
+      digits = digits.substring(0, 8);
+    }
+
+    var formatted = digits;
+
+    if (digits.length > 5) {
+      formatted = '${digits.substring(0, 5)}-${digits.substring(5)}';
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }
