@@ -194,6 +194,105 @@ class ApiClient {
     }
   }
 
+  Future<AuthSession> updateUserPhone({
+    required int userId,
+    required String phone,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/app-users/$userId/phone',
+        data: {
+          'phone': _onlyDigits(phone),
+        },
+      );
+
+      final saved = await getSavedSession();
+
+      final responseData = response.data;
+
+      final userData = responseData is Map<String, dynamic> &&
+              responseData.containsKey('user')
+          ? responseData['user']
+          : responseData;
+
+      if (userData is! Map<String, dynamic>) {
+        throw const ApiException(
+          'Resposta inválida do servidor ao atualizar telefone.',
+        );
+      }
+
+      final updated = AuthSession.fromJson({
+        'token': saved?.token ?? await getToken() ?? '',
+        'user': userData,
+      });
+
+      await saveSession(updated);
+
+      return updated;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<AuthSession> updateProfileSecurity({
+    required int userId,
+    String? phone,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+
+      final cleanPhone = phone == null ? '' : _onlyDigits(phone);
+
+      if (cleanPhone.isNotEmpty) {
+        data['phone'] = cleanPhone;
+      }
+
+      if (newPassword != null && newPassword.trim().isNotEmpty) {
+        data['current_password'] = currentPassword ?? '';
+        data['new_password'] = newPassword;
+      }
+
+      if (data.isEmpty) {
+        throw const ApiException(
+          'Informe telefone e/ou nova senha para atualizar.',
+        );
+      }
+
+      final response = await _dio.put(
+        '/app-users/$userId/profile-security',
+        data: data,
+      );
+
+      final saved = await getSavedSession();
+
+      final responseData = response.data;
+
+      final userData = responseData is Map<String, dynamic> &&
+              responseData.containsKey('user')
+          ? responseData['user']
+          : responseData;
+
+      if (userData is! Map<String, dynamic>) {
+        throw const ApiException(
+          'Resposta inválida do servidor ao atualizar perfil.',
+        );
+      }
+
+      final updated = AuthSession.fromJson({
+        'token': saved?.token ?? await getToken() ?? '',
+        'user': userData,
+      });
+
+      await saveSession(updated);
+
+      return updated;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
   Future<AuthSession> uploadSelfie({
     required int facialUserId,
     required File imageFile,

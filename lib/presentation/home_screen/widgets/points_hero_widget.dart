@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
+
 import '../../../theme/app_theme.dart';
 import '../../../widgets/status_badge_widget.dart';
 
@@ -32,13 +33,19 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
   @override
   void initState() {
     super.initState();
+
     _arcController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
+
     _arcAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _arcController, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _arcController,
+        curve: Curves.easeOutCubic,
+      ),
     );
+
     _arcController.forward();
   }
 
@@ -48,18 +55,75 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
     super.dispose();
   }
 
-  double get _progress =>
-      (widget.points / widget.nextRewardPoints).clamp(0.0, 1.0);
+  int get _safeNextRewardPoints {
+    if (widget.nextRewardPoints <= 0) {
+      return 100;
+    }
+
+    return widget.nextRewardPoints;
+  }
+
+  int get _remainingPoints {
+    final remaining = _safeNextRewardPoints - widget.points;
+
+    if (remaining <= 0) {
+      return 0;
+    }
+
+    return remaining;
+  }
+
+  double get _progress {
+    if (_safeNextRewardPoints <= 0) {
+      return 0.0;
+    }
+
+    return (widget.points / _safeNextRewardPoints).clamp(0.0, 1.0);
+  }
+
+  String get _formattedPoints {
+    return widget.points.toString().replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (match) => '${match[1]}.',
+        );
+  }
 
   BadgeStatus get _tierBadge {
-    switch (widget.tier.toLowerCase()) {
-      case 'gold':
-        return BadgeStatus.gold;
-      case 'silver':
-        return BadgeStatus.silver;
-      default:
-        return BadgeStatus.bronze;
+    final tier = widget.tier.toLowerCase().trim();
+
+    if (tier.contains('gold') || tier.contains('ouro')) {
+      return BadgeStatus.gold;
     }
+
+    if (tier.contains('silver') || tier.contains('prata')) {
+      return BadgeStatus.silver;
+    }
+
+    return BadgeStatus.bronze;
+  }
+
+  String get _tierLabel {
+    final tier = widget.tier.trim();
+
+    if (tier.isEmpty) {
+      return 'Cliente Borghetto';
+    }
+
+    final lowerTier = tier.toLowerCase();
+
+    if (lowerTier == 'gold') {
+      return 'Cliente Ouro';
+    }
+
+    if (lowerTier == 'silver') {
+      return 'Cliente Prata';
+    }
+
+    if (lowerTier == 'bronze') {
+      return 'Cliente Borghetto';
+    }
+
+    return tier;
   }
 
   @override
@@ -74,29 +138,27 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
         ),
         child: Row(
           children: [
-            // Left: text info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   StatusBadgeWidget(
-                    label: '${widget.tier} Member',
+                    label: _tierLabel,
                     status: _tierBadge,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.points.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
+                    _formattedPoints,
                     style: GoogleFonts.outfit(
                       fontSize: 40,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                       height: 1,
-                      fontFeatures: [const FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'loyalty points',
+                    'Pontos disponíveis',
                     style: GoogleFonts.outfit(
                       fontSize: 13,
                       color: Colors.white.withAlpha(153),
@@ -104,7 +166,9 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '${widget.nextRewardPoints - widget.points} pts to next reward',
+                    _remainingPoints == 0
+                        ? 'Benefício disponível'
+                        : 'Faltam $_remainingPoints pontos para o próximo benefício',
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       color: AppTheme.accent,
@@ -112,7 +176,6 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  // Progress bar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: AnimatedBuilder(
@@ -122,7 +185,7 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
                           value: _progress * _arcAnimation.value,
                           minHeight: 6,
                           backgroundColor: Colors.white.withAlpha(38),
-                          valueColor: AlwaysStoppedAnimation<Color>(
+                          valueColor: const AlwaysStoppedAnimation<Color>(
                             AppTheme.accent,
                           ),
                         );
@@ -133,7 +196,6 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
               ),
             ),
             const SizedBox(width: 20),
-            // Right: radial arc progress
             AnimatedBuilder(
               animation: _arcAnimation,
               builder: (context, child) {
@@ -156,13 +218,10 @@ class _PointsHeroWidgetState extends State<PointsHeroWidget>
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
-                              fontFeatures: [
-                                const FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                           Text(
-                            'to tier',
+                            'do clube',
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               color: Colors.white.withAlpha(153),
@@ -230,6 +289,9 @@ class _ArcPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ArcPainter oldDelegate) =>
-      oldDelegate.progress != progress;
+  bool shouldRepaint(_ArcPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.progressColor != progressColor;
+  }
 }

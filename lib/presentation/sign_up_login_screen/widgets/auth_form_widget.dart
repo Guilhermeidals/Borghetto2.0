@@ -894,11 +894,11 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
           const SizedBox(height: 8),
 
-          _credRow('Email', 'teste@borghetto.com.br'),
+          _credRow('Email', 'giovane@eventelecom.com.br'),
 
           const SizedBox(height: 4),
 
-          _credRow('Senha', '123456'),
+          _credRow('Senha', 'Milen@93'),
         ],
       ),
     );

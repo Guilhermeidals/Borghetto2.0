@@ -1,46 +1,84 @@
 class AuthSession {
-  final String token;
-  final int userId;
-  final String name;
-  final String? cpf;
-  final String? phone;
-  final String? email;
-  final String? photoUrl;
-  final String? accessStatus;
-  final int? controlIdUserId;
-
   const AuthSession({
     required this.token,
     required this.userId,
     required this.name,
+    this.email,
     this.cpf,
     this.phone,
-    this.email,
+    this.birthDate,
+    this.role,
+    this.active,
+    this.controlIdUserId,
+    this.zipCode,
+    this.street,
+    this.number,
+    this.complement,
+    this.neighborhood,
+    this.city,
+    this.state,
     this.photoUrl,
     this.accessStatus,
-    this.controlIdUserId,
   });
 
+  final String token;
+  final int userId;
+  final String name;
+
+  final String? email;
+  final String? cpf;
+  final String? phone;
+  final String? birthDate;
+  final String? role;
+  final bool? active;
+
+  final int? controlIdUserId;
+
+  final String? zipCode;
+  final String? street;
+  final String? number;
+  final String? complement;
+  final String? neighborhood;
+  final String? city;
+  final String? state;
+
+  final String? photoUrl;
+  final String? accessStatus;
+
   factory AuthSession.fromJson(Map<String, dynamic> json) {
-    final user = json['user'] as Map<String, dynamic>? ?? json;
+    final userRaw = json['user'];
+
+    final Map<String, dynamic> user =
+        userRaw is Map<String, dynamic> ? userRaw : json;
 
     return AuthSession(
       token: json['token']?.toString() ?? '',
-      userId: int.tryParse(user['id']?.toString() ?? '') ?? 0,
+      userId: _parseInt(user['id'] ?? user['userId'] ?? user['user_id']),
       name: user['name']?.toString() ?? '',
+
+      email: user['email']?.toString(),
       cpf: user['cpf']?.toString(),
       phone: user['phone']?.toString(),
-      email: user['email']?.toString(),
-      photoUrl: user['photoUrl']?.toString() ?? user['photo_path']?.toString(),
-      accessStatus: user['accessStatus']?.toString() ?? user['access_status']?.toString(),
-      controlIdUserId: int.tryParse(
-        user['controlIdUserId']?.toString() ??
-            user['control_id_user_id']?.toString() ??
-            user['control_id']?.toString() ??
-            user['facialUserId']?.toString() ??
-            user['facial_user_id']?.toString() ??
-            '',
+
+      birthDate: (user['birthDate'] ?? user['birth_date'])?.toString(),
+
+      role: user['role']?.toString(),
+      active: _parseBool(user['active']),
+
+      controlIdUserId: _parseNullableInt(
+        user['controlIdUserId'] ?? user['control_id_user_id'],
       ),
+
+      zipCode: (user['zipCode'] ?? user['zip_code'])?.toString(),
+      street: user['street']?.toString(),
+      number: user['number']?.toString(),
+      complement: user['complement']?.toString(),
+      neighborhood: user['neighborhood']?.toString(),
+      city: user['city']?.toString(),
+      state: user['state']?.toString(),
+
+      photoUrl: (user['photoUrl'] ?? user['photo_url'])?.toString(),
+      accessStatus: (user['accessStatus'] ?? user['access_status'])?.toString(),
     );
   }
 
@@ -50,13 +88,129 @@ class AuthSession {
       'user': {
         'id': userId,
         'name': name,
+        'email': email,
         'cpf': cpf,
         'phone': phone,
-        'email': email,
-        'photoUrl': photoUrl,
-        'accessStatus': accessStatus,
+
+        'birth_date': birthDate,
+        'birthDate': birthDate,
+
+        'role': role,
+        'active': active,
+
+        'control_id_user_id': controlIdUserId,
         'controlIdUserId': controlIdUserId,
-      }
+
+        'zip_code': zipCode,
+        'zipCode': zipCode,
+
+        'street': street,
+        'number': number,
+        'complement': complement,
+        'neighborhood': neighborhood,
+        'city': city,
+        'state': state,
+
+        'photoUrl': photoUrl,
+        'photo_url': photoUrl,
+
+        'accessStatus': accessStatus,
+        'access_status': accessStatus,
+      },
     };
+  }
+
+  AuthSession copyWith({
+    String? token,
+    int? userId,
+    String? name,
+    String? email,
+    String? cpf,
+    String? phone,
+    String? birthDate,
+    String? role,
+    bool? active,
+    int? controlIdUserId,
+    String? zipCode,
+    String? street,
+    String? number,
+    String? complement,
+    String? neighborhood,
+    String? city,
+    String? state,
+    String? photoUrl,
+    String? accessStatus,
+  }) {
+    return AuthSession(
+      token: token ?? this.token,
+      userId: userId ?? this.userId,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      cpf: cpf ?? this.cpf,
+      phone: phone ?? this.phone,
+      birthDate: birthDate ?? this.birthDate,
+      role: role ?? this.role,
+      active: active ?? this.active,
+      controlIdUserId: controlIdUserId ?? this.controlIdUserId,
+      zipCode: zipCode ?? this.zipCode,
+      street: street ?? this.street,
+      number: number ?? this.number,
+      complement: complement ?? this.complement,
+      neighborhood: neighborhood ?? this.neighborhood,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      photoUrl: photoUrl ?? this.photoUrl,
+      accessStatus: accessStatus ?? this.accessStatus,
+    );
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is String) {
+      return int.tryParse(value) ?? 0;
+    }
+
+    return 0;
+  }
+
+  static int? _parseNullableInt(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is int) {
+      return value;
+    }
+
+    if (value is String) {
+      return int.tryParse(value);
+    }
+
+    return null;
+  }
+
+  static bool? _parseBool(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is String) {
+      if (value.toLowerCase() == 'true') {
+        return true;
+      }
+
+      if (value.toLowerCase() == 'false') {
+        return false;
+      }
+    }
+
+    return null;
   }
 }

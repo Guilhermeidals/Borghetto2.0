@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
-
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_session.dart';
@@ -30,6 +30,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isUploadingPhoto = false;
   bool _isSavingProfile = false;
 
+  int _photoVersion = 0;
+
   @override
   void initState() {
     super.initState();
@@ -37,26 +39,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadSession() async {
+    AuthSession? savedSession;
+
     try {
-      final session = await ApiClient.instance.getSavedSession();
+      savedSession = await ApiClient.instance.getSavedSession();
+
+      if (mounted && savedSession != null) {
+        setState(() {
+          _session = savedSession;
+        });
+      }
+
+      final freshSession = await ApiClient.instance.me();
 
       if (!mounted) return;
 
       setState(() {
-        _session = session;
+        _session = freshSession;
         _isLoadingSession = false;
       });
     } catch (_) {
       if (!mounted) return;
 
       setState(() {
+        _session = savedSession;
         _isLoadingSession = false;
       });
 
-      _showSnackBar(
-        'Não foi possível carregar os dados do perfil.',
-        isError: true,
-      );
+      if (savedSession == null) {
+        _showSnackBar(
+          'Não foi possível carregar os dados do perfil.',
+          isError: true,
+        );
+      }
     }
   }
 
@@ -98,6 +113,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return phone;
+  }
+
+  String get _displayBirthDate {
+    final birthDate = _session?.birthDate?.trim();
+
+    if (birthDate == null || birthDate.isEmpty) {
+      return 'Data de nascimento não informada';
+    }
+
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(birthDate)) {
+      final parts = birthDate.substring(0, 10).split('-');
+      return '${parts[2]}/${parts[1]}/${parts[0]}';
+    }
+
+    return birthDate;
+  }
+
+  String get _displayZipCode {
+    final zipCode = _session?.zipCode?.trim();
+
+    if (zipCode == null || zipCode.isEmpty) {
+      return 'CEP não informado';
+    }
+
+    final digits = _onlyDigits(zipCode);
+
+    if (digits.length == 8) {
+      return '${digits.substring(0, 5)}-${digits.substring(5)}';
+    }
+
+    return zipCode;
+  }
+
+  String get _displayStreetNumber {
+    final street = _session?.street?.trim();
+    final number = _session?.number?.trim();
+
+    if (street == null || street.isEmpty) {
+      return 'Rua não informada';
+    }
+
+    if (number == null || number.isEmpty) {
+      return street;
+    }
+
+    return '$street, $number';
+  }
+
+  String get _displayComplement {
+    final complement = _session?.complement?.trim();
+
+    if (complement == null || complement.isEmpty) {
+      return 'Complemento não informado';
+    }
+
+    return complement;
+  }
+
+  String get _displayNeighborhood {
+    final neighborhood = _session?.neighborhood?.trim();
+
+    if (neighborhood == null || neighborhood.isEmpty) {
+      return 'Bairro não informado';
+    }
+
+    return neighborhood;
+  }
+
+  String get _displayCityState {
+    final city = _session?.city?.trim();
+    final state = _session?.state?.trim();
+
+    if (city != null && city.isNotEmpty && state != null && state.isNotEmpty) {
+      return '$city/$state';
+    }
+
+    if (city != null && city.isNotEmpty) {
+      return city;
+    }
+
+    if (state != null && state.isNotEmpty) {
+      return state;
+    }
+
+    return 'Cidade/UF não informadas';
   }
 
   String get _initials {
@@ -160,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final url = ApiClient.instance.resolveFileUrl(
-      '/facial/users/$facialUserId/face',
+      '/facial/users/$facialUserId/face?v=$_photoVersion',
     );
 
     if (url.isEmpty) {
@@ -172,15 +272,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.outfit(fontSize: 13),
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
         ),
-        backgroundColor: isError ? AppTheme.error : AppTheme.primary,
+        backgroundColor: isError
+            ? AppTheme.error
+            : const Color(0xFF2E7D52),
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
@@ -354,9 +462,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   });
 
   try {
+    final preparedImage = await _prepareImageForUpload(image);
+
     final updatedSession = await ApiClient.instance.uploadSelfie(
       facialUserId: facialUserId,
-      imageFile: File(image.path),
+      imageFile: preparedImage,
     );
 
     if (!mounted) return;
@@ -364,6 +474,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() {
       _session = updatedSession;
       _profilePhoto = null;
+      _photoVersion = DateTime.now().millisecondsSinceEpoch;
     });
 
     _showSnackBar('Foto enviada com sucesso.');
@@ -426,11 +537,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final nameController = TextEditingController(text: session.name);
-    final cpfController = TextEditingController(text: session.cpf ?? '');
-    final phoneController = TextEditingController(text: _formatPhone(session.phone ?? ''),);
-    final emailController = TextEditingController(text: session.email ?? '');
+    final phoneController = TextEditingController(
+      text: _formatPhone(session.phone ?? ''),
+    );
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
     final formKey = GlobalKey<FormState>();
+
+    bool obscureCurrentPassword = true;
+    bool obscureNewPassword = true;
+    bool obscureConfirmPassword = true;
 
     await showDialog<void>(
       context: context,
@@ -446,45 +564,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextFormField(
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Informe seu nome';
-                          }
-
-                          if (value.trim().length < 3) {
-                            return 'Informe um nome válido';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: cpfController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'CPF',
-                        ),
-                        validator: (value) {
-                          final cpf = _onlyDigits(value ?? '');
-
-                          if (cpf.isEmpty) {
-                            return 'Informe seu CPF';
-                          }
-
-                          if (cpf.length != 11) {
-                            return 'O CPF precisa ter 11 números';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
                         inputFormatters: [
@@ -494,6 +573,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Telefone',
+                          prefixIcon: Icon(Icons.phone_outlined),
                         ),
                         validator: (value) {
                           final phone = _onlyDigits(value ?? '');
@@ -509,23 +589,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Alterar senha',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Preencha os campos abaixo somente se quiser trocar sua senha.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: AppTheme.mutedText,
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       TextFormField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail',
+                        controller: currentPasswordController,
+                        obscureText: obscureCurrentPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Senha atual',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureCurrentPassword =
+                                    !obscureCurrentPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureCurrentPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
                         ),
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Informe seu e-mail';
+                          final currentPassword = value ?? '';
+                          final newPassword = newPasswordController.text;
+                          final confirmPassword =
+                              confirmPasswordController.text;
+
+                          final wantsToChangePassword =
+                              currentPassword.isNotEmpty ||
+                                  newPassword.isNotEmpty ||
+                                  confirmPassword.isNotEmpty;
+
+                          if (!wantsToChangePassword) {
+                            return null;
                           }
 
-                          final emailRegex =
-                              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                          if (currentPassword.isEmpty) {
+                            return 'Informe sua senha atual';
+                          }
 
-                          if (!emailRegex.hasMatch(value.trim())) {
-                            return 'Informe um e-mail válido';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: newPasswordController,
+                        obscureText: obscureNewPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Nova senha',
+                          prefixIcon: const Icon(Icons.lock_reset_outlined),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureNewPassword = !obscureNewPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureNewPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          final currentPassword =
+                              currentPasswordController.text;
+                          final newPassword = value ?? '';
+                          final confirmPassword =
+                              confirmPasswordController.text;
+
+                          final wantsToChangePassword =
+                              currentPassword.isNotEmpty ||
+                                  newPassword.isNotEmpty ||
+                                  confirmPassword.isNotEmpty;
+
+                          if (!wantsToChangePassword) {
+                            return null;
+                          }
+
+                          if (newPassword.isEmpty) {
+                            return 'Informe a nova senha';
+                          }
+
+                          if (newPassword.length < 6) {
+                            return 'A nova senha precisa ter pelo menos 6 caracteres';
+                          }
+
+                          if (newPassword == currentPassword) {
+                            return 'A nova senha precisa ser diferente da atual';
+                          }
+
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        obscureText: obscureConfirmPassword,
+                        decoration: InputDecoration(
+                          labelText: 'Confirmar nova senha',
+                          prefixIcon: const Icon(Icons.lock_reset_outlined),
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setDialogState(() {
+                                obscureConfirmPassword =
+                                    !obscureConfirmPassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscureConfirmPassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          final currentPassword =
+                              currentPasswordController.text;
+                          final newPassword = newPasswordController.text;
+                          final confirmPassword = value ?? '';
+
+                          final wantsToChangePassword =
+                              currentPassword.isNotEmpty ||
+                                  newPassword.isNotEmpty ||
+                                  confirmPassword.isNotEmpty;
+
+                          if (!wantsToChangePassword) {
+                            return null;
+                          }
+
+                          if (confirmPassword.isEmpty) {
+                            return 'Confirme a nova senha';
+                          }
+
+                          if (confirmPassword != newPassword) {
+                            return 'As senhas não conferem';
                           }
 
                           return null;
@@ -554,12 +770,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _isSavingProfile = true;
                           });
 
-                          await _saveProfile(
+                          final newPassword =
+                              newPasswordController.text.trim();
+
+                          final success = await _saveProfileSecurity(
                             userId: session.userId,
-                            name: nameController.text.trim(),
-                            cpf: _onlyDigits(cpfController.text.trim()),
-                            phone: _onlyDigits(phoneController.text.trim()),
-                            email: emailController.text.trim(),
+                            phone: _onlyDigits(phoneController.text),
+                            currentPassword: currentPasswordController.text,
+                            newPassword:
+                                newPassword.isEmpty ? null : newPassword,
                           );
 
                           if (!mounted) return;
@@ -568,7 +787,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _isSavingProfile = false;
                           });
 
-                          if (Navigator.of(dialogContext).canPop()) {
+                          if (success &&
+                              Navigator.of(dialogContext).canPop()) {
                             Navigator.of(dialogContext).pop();
                           }
                         },
@@ -587,11 +807,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       },
     );
 
-    nameController.dispose();
-    cpfController.dispose();
-    phoneController.dispose();
-    emailController.dispose();
-
     if (mounted) {
       setState(() {
         _isSavingProfile = false;
@@ -599,37 +814,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _saveProfile({
+  Future<bool> _saveProfileSecurity({
     required int userId,
-    required String name,
-    required String cpf,
     required String phone,
-    required String email,
+    String? currentPassword,
+    String? newPassword,
   }) async {
     try {
-      final updatedSession = await ApiClient.instance.updateUser(
+      final updatedSession = await ApiClient.instance.updateProfileSecurity(
         userId: userId,
-        name: name,
-        cpf: cpf,
         phone: phone,
-        email: email,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
       );
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
       setState(() {
         _session = updatedSession;
       });
 
-      _showSnackBar('Perfil atualizado com sucesso.');
+      if (newPassword != null && newPassword.trim().isNotEmpty) {
+        _showSnackBar('Telefone e/ou senha atualizados com sucesso.');
+      } else {
+        _showSnackBar('Telefone atualizado com sucesso.');
+      }
+
+      return true;
     } on ApiException catch (e) {
       _showSnackBar(e.message, isError: true);
+      return false;
     } catch (_) {
       _showSnackBar(
-        'Erro inesperado ao atualizar o perfil.',
+        'Erro inesperado ao atualizar perfil.',
         isError: true,
       );
+      return false;
     }
+  }
+
+  Future<File> _prepareImageForUpload(XFile image) async {
+    final originalFile = File(image.path);
+
+    final targetPath =
+        '${image.path}_fixed_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    final fixedImage = await FlutterImageCompress.compressAndGetFile(
+      originalFile.absolute.path,
+      targetPath,
+      quality: 92,
+      format: CompressFormat.jpeg,
+      autoCorrectionAngle: true,
+      keepExif: false,
+    );
+
+    if (fixedImage == null) {
+      return originalFile;
+    }
+
+    return File(fixedImage.path);
   }
 
   @override
@@ -652,6 +895,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SliverToBoxAdapter(child: _buildHeader(context)),
             SliverToBoxAdapter(child: _buildMemberCard(context)),
             SliverToBoxAdapter(child: _buildStatsRow(context)),
+            SliverToBoxAdapter(child: _buildProfileDataSection(context)),
             SliverToBoxAdapter(child: _buildMenuSection(context)),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
@@ -961,6 +1205,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _buildProfileDataSection(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Dados do perfil',
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.mutedText,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceLight,
+              borderRadius: BorderRadius.circular(16.0),
+              border: Border.all(color: AppTheme.outlineLight),
+            ),
+            child: Column(
+              children: [
+                _buildProfileDataRow(
+                  icon: Icons.badge_outlined,
+                  label: 'CPF',
+                  value: _displayCpf,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.phone_outlined,
+                  label: 'Telefone',
+                  value: _formatPhone(_displayPhone),
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.cake_outlined,
+                  label: 'Nascimento',
+                  value: _displayBirthDate,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.home_outlined,
+                  label: 'Rua e número',
+                  value: _displayStreetNumber,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.maps_home_work_outlined,
+                  label: 'Complemento',
+                  value: _displayComplement,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.location_city_outlined,
+                  label: 'Bairro',
+                  value: _displayNeighborhood,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.location_on_outlined,
+                  label: 'Cidade/Estado',
+                  value: _displayCityState,
+                ),
+                const SizedBox(height: 14),
+                _buildProfileDataRow(
+                  icon: Icons.markunread_mailbox_outlined,
+                  label: 'CEP',
+                  value: _displayZipCode,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileDataRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceVariantLight,
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: AppTheme.darkText,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.mutedText,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.darkText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMenuSection(BuildContext context) {
     final menuItems = [
       {
@@ -975,13 +1349,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'label': 'Carteirinha digital',
         'subtitle': 'Veja seu cartão de membro',
         'onTap': () => context.go(AppRoutes.digitalMembershipCardScreen),
-        'accent': false,
-      },
-      {
-        'icon': Icons.person_outline_rounded,
-        'label': 'Dados do perfil',
-        'subtitle': 'Nome, CPF, telefone e e-mail',
-        'onTap': _showEditProfileDialog,
         'accent': false,
       },
       {
