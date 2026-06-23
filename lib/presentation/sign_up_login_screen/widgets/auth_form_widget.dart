@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../../widgets/borghetto_button.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 
@@ -324,34 +325,34 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
   }
 
   bool _isValidCpf(String value) {
-  final cpf = _onlyDigits(value);
+    final cpf = _onlyDigits(value);
 
-  if (cpf.length != 11) return false;
+    if (cpf.length != 11) return false;
 
-  if (RegExp(r'^(\d)\1{10}$').hasMatch(cpf)) return false;
+    if (RegExp(r'^(\d)\1{10}$').hasMatch(cpf)) return false;
 
-  final digits = cpf.split('').map(int.parse).toList();
+    final digits = cpf.split('').map(int.parse).toList();
 
-  var sum = 0;
-  for (var i = 0; i < 9; i++) {
-    sum += digits[i] * (10 - i);
+    var sum = 0;
+    for (var i = 0; i < 9; i++) {
+      sum += digits[i] * (10 - i);
+    }
+
+    var firstCheckDigit = 11 - (sum % 11);
+    if (firstCheckDigit >= 10) firstCheckDigit = 0;
+
+    if (digits[9] != firstCheckDigit) return false;
+
+    sum = 0;
+    for (var i = 0; i < 10; i++) {
+      sum += digits[i] * (11 - i);
+    }
+
+    var secondCheckDigit = 11 - (sum % 11);
+    if (secondCheckDigit >= 10) secondCheckDigit = 0;
+
+    return digits[10] == secondCheckDigit;
   }
-
-  var firstCheckDigit = 11 - (sum % 11);
-  if (firstCheckDigit >= 10) firstCheckDigit = 0;
-
-  if (digits[9] != firstCheckDigit) return false;
-
-  sum = 0;
-  for (var i = 0; i < 10; i++) {
-    sum += digits[i] * (11 - i);
-  }
-
-  var secondCheckDigit = 11 - (sum % 11);
-  if (secondCheckDigit >= 10) secondCheckDigit = 0;
-
-  return digits[10] == secondCheckDigit;
-}
 
   void _handleToggleMode() {
     _formKey.currentState?.reset();
@@ -365,14 +366,22 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isTablet = width >= 600;
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.surfaceLight,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: isTablet
+            ? AppTheme.radiusExtraLarge
+            : const BorderRadius.vertical(
+                top: Radius.circular(34),
+              ),
         border: Border.all(color: AppTheme.outlineLight),
+        boxShadow: AppTheme.premiumShadow,
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
         child: Form(
           key: _formKey,
           child: Column(
@@ -380,39 +389,66 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
             children: [
               Center(
                 child: Container(
-                  width: 40,
-                  height: 4,
+                  width: 44,
+                  height: 5,
                   decoration: BoxDecoration(
                     color: AppTheme.outlineLight,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
+
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: AppTheme.forestMist,
+                  borderRadius: AppTheme.radiusPill,
+                  border: Border.all(
+                    color: AppTheme.forest.withAlpha(20),
+                  ),
+                ),
+                child: Text(
+                  widget.isLogin ? 'Clube Borghetto' : 'Novo cadastro',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.forest,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 14),
 
               Text(
                 widget.isLogin
-                    ? 'Bem vindo de volta'
-                    : 'Registre-se no Borghetto',
+                    ? 'Bem-vindo de volta'
+                    : 'Entre para o Borghetto',
                 style: GoogleFonts.outfit(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 27,
+                  height: 1.05,
+                  fontWeight: FontWeight.w900,
                   color: AppTheme.darkText,
                 ),
               ),
 
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
 
               Text(
-                widget.isLogin ? 'Entre na sua conta' : 'Crie sua conta',
+                widget.isLogin
+                    ? 'Acesse sua conta e aproveite o sabor de um novo dia.'
+                    : 'Crie sua conta para acessar benefícios, carteirinha e entrada facial.',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
                   color: AppTheme.mutedText,
                 ),
               ),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               if (widget.isLogin) ...[
                 _buildDemoCredentialsBox(),
@@ -420,6 +456,10 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
               ],
 
               if (!widget.isLogin) ...[
+                _buildSectionTitle('Dados pessoais'),
+
+                const SizedBox(height: 14),
+
                 _buildUnderlineField(
                   controller: _nameController,
                   label: 'Nome',
@@ -439,7 +479,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _cpfController,
@@ -470,7 +510,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _phoneController,
@@ -489,7 +529,9 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                       return 'Insira seu telefone';
                     }
 
-                    final phoneRegex = RegExp(r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$');
+                    final phoneRegex = RegExp(
+                      r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$',
+                    );
 
                     if (!phoneRegex.hasMatch(phone)) {
                       return 'Informe DDD + telefone válido';
@@ -499,7 +541,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _birthDateController,
@@ -524,7 +566,11 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 22),
+
+                _buildSectionTitle('Endereço'),
+
+                const SizedBox(height: 14),
 
                 _buildUnderlineField(
                   controller: _zipCodeController,
@@ -573,7 +619,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _streetController,
@@ -594,7 +640,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _numberController,
@@ -618,7 +664,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _complementController,
@@ -628,7 +674,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   textInputAction: TextInputAction.next,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _neighborhoodController,
@@ -645,7 +691,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _cityController,
@@ -662,7 +708,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
                 _buildUnderlineField(
                   controller: _stateController,
@@ -684,6 +730,11 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                     return null;
                   },
                 ),
+
+                const SizedBox(height: 22),
+
+                _buildSectionTitle('Acesso'),
+                const SizedBox(height: 14),
               ],
 
               _buildUnderlineField(
@@ -708,7 +759,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                 },
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               _buildUnderlineField(
                 controller: _passwordController,
@@ -765,11 +816,11 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                                   _rememberMe = v ?? false;
                                 });
                               },
-                        activeColor: AppTheme.accent,
+                        activeColor: AppTheme.forest,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(5),
                         ),
-                        side: BorderSide(color: AppTheme.outlineLight),
+                        side: const BorderSide(color: AppTheme.outlineLight),
                       ),
                     ),
 
@@ -777,6 +828,7 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                       'Lembrar-me',
                       style: GoogleFonts.outfit(
                         fontSize: 13,
+                        fontWeight: FontWeight.w500,
                         color: AppTheme.mutedText,
                       ),
                     ),
@@ -784,42 +836,18 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                 ),
               ],
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.darkText,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          widget.isLogin ? 'Entrar' : 'Criar conta',
-                          style: GoogleFonts.outfit(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
+              BorghettoButton(
+                label: widget.isLogin ? 'Entrar' : 'Criar conta',
+                icon: widget.isLogin
+                    ? Icons.login_rounded
+                    : Icons.person_add_alt_1_rounded,
+                loading: _isLoading,
+                onPressed: _isLoading ? null : _handleSubmit,
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               if (widget.isLogin) _buildFaceIdButton(),
 
@@ -837,17 +865,17 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
                       children: [
                         TextSpan(
                           text: widget.isLogin
-                              ? 'Não possui uma conta? '
+                              ? 'Ainda não é membro? '
                               : 'Já é membro? ',
                         ),
                         TextSpan(
                           text: widget.isLogin
-                              ? 'Registre-se'
-                              : 'Entre agora',
+                              ? 'Criar cadastro'
+                              : 'Entrar agora',
                           style: GoogleFonts.outfit(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.darkText,
+                            fontWeight: FontWeight.w800,
+                            color: AppTheme.forest,
                           ),
                         ),
                       ],
@@ -862,41 +890,76 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
     );
   }
 
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: const BoxDecoration(
+            color: AppTheme.caramel,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            color: AppTheme.forest,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDemoCredentialsBox() {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: AppTheme.accentLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.accentContainer),
+        color: AppTheme.forestMist,
+        borderRadius: AppTheme.radiusMedium,
+        border: Border.all(
+          color: AppTheme.forest.withAlpha(24),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.info_outline_rounded,
-                size: 16,
-                color: AppTheme.accent,
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: AppTheme.forest,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 9),
               Text(
                 'Conta de teste',
                 style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.forest,
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           _credRow('Email', 'giovane@eventelecom.com.br'),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 7),
 
           _credRow('Senha', 'Milen@93'),
         ],
@@ -908,11 +971,12 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
     return Row(
       children: [
         SizedBox(
-          width: 64,
+          width: 58,
           child: Text(
             label,
             style: GoogleFonts.outfit(
               fontSize: 12,
+              fontWeight: FontWeight.w600,
               color: AppTheme.mutedText,
             ),
           ),
@@ -923,11 +987,14 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
             value,
             style: GoogleFonts.outfit(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               color: AppTheme.darkText,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
+
+        const SizedBox(width: 8),
 
         GestureDetector(
           onTap: () {
@@ -940,17 +1007,18 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
             setState(() {});
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: AppTheme.accentContainer,
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.surfaceLight,
+              borderRadius: AppTheme.radiusPill,
+              border: Border.all(color: AppTheme.outlineLight),
             ),
             child: Text(
               'Usar',
               style: GoogleFonts.outfit(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.accent,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.forest,
               ),
             ),
           ),
@@ -965,22 +1033,23 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       height: 54,
       child: OutlinedButton.icon(
         onPressed: _isLoading ? null : _handleFaceId,
-        icon: const Icon(Icons.face_rounded, size: 22),
+        icon: const Icon(Icons.face_rounded, size: 21),
         label: Text(
           'Continuar com Face ID',
           style: GoogleFonts.outfit(
             fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w800,
           ),
         ),
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppTheme.darkText,
-          side: BorderSide(
+          foregroundColor: AppTheme.forest,
+          backgroundColor: AppTheme.cream,
+          side: const BorderSide(
             color: AppTheme.outlineLight,
-            width: 1.5,
+            width: 1.2,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: AppTheme.radiusPill,
           ),
         ),
       ),
@@ -1013,63 +1082,90 @@ class _AuthFormWidgetState extends State<AuthFormWidget> {
       enabled: !_isLoading,
       style: GoogleFonts.outfit(
         fontSize: 15,
+        height: 1.25,
         color: AppTheme.darkText,
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w600,
       ),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
+        isDense: false,
         prefixIcon: Icon(
           icon,
-          size: 20,
-          color: AppTheme.mutedText,
+          size: 21,
+          color: AppTheme.coffee,
         ),
         suffixIcon: suffixIcon,
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 50,
+          minHeight: 56,
+        ),
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 48,
+          minHeight: 56,
+        ),
         labelStyle: GoogleFonts.outfit(
           fontSize: 13,
+          height: 1.2,
+          fontWeight: FontWeight.w600,
           color: AppTheme.mutedText,
+        ),
+        floatingLabelStyle: GoogleFonts.outfit(
+          fontSize: 13,
+          height: 1.2,
+          fontWeight: FontWeight.w800,
+          color: AppTheme.forest,
         ),
         hintStyle: GoogleFonts.outfit(
           fontSize: 14,
-          color: AppTheme.outlineLight,
+          height: 1.2,
+          fontWeight: FontWeight.w500,
+          color: AppTheme.mutedText.withAlpha(140),
         ),
-        border: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.outlineLight,
-          ),
-        ),
-        enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.outlineLight,
-          ),
-        ),
-        focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.darkText,
-            width: 1.5,
-          ),
-        ),
-        errorBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.error,
-          ),
-        ),
-        focusedErrorBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.error,
-            width: 1.5,
-          ),
-        ),
-        disabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(
-            color: AppTheme.outlineLight,
-          ),
-        ),
-        filled: false,
+        filled: true,
+        fillColor: AppTheme.cream,
         contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 0,
+          vertical: 18,
+          horizontal: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.outlineLight,
+          ),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.outlineLight,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.forest,
+            width: 1.4,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.error,
+          ),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.error,
+            width: 1.4,
+          ),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: AppTheme.radiusMedium,
+          borderSide: const BorderSide(
+            color: AppTheme.outlineLight,
+          ),
         ),
       ),
     );
