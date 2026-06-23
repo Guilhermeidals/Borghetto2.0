@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../theme/app_theme.dart';
 
 class DoorUnlockFabWidget extends StatefulWidget {
@@ -12,21 +15,29 @@ class DoorUnlockFabWidget extends StatefulWidget {
 
 class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
     with SingleTickerProviderStateMixin {
-  // TODO: Replace with [Riverpod/Bloc] for production
   bool _isUnlocking = false;
   bool _isUnlocked = false;
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.15,
+    ).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
     );
   }
 
@@ -38,28 +49,70 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
 
   Future<void> _handleUnlock() async {
     if (_isUnlocking) return;
+
     setState(() => _isUnlocking = true);
     _pulseController.repeat(reverse: true);
 
-    // TODO: Replace with local_auth Face ID + door API call
-    await Future.delayed(const Duration(milliseconds: 1500));
+    try {
+      await ApiClient.instance.openDoor();
 
-    _pulseController.stop();
-    _pulseController.reset();
-    setState(() {
-      _isUnlocking = false;
-      _isUnlocked = true;
-    });
+      if (!mounted) return;
 
-    Fluttertoast.showToast(
-      msg: '🔓 Porta da loja está liberada!',
-      backgroundColor: AppTheme.accent,
-      textColor: Colors.white,
-      toastLength: Toast.LENGTH_LONG,
-    );
+      _pulseController.stop();
+      _pulseController.reset();
 
-    await Future.delayed(const Duration(seconds: 3));
-    if (mounted) setState(() => _isUnlocked = false);
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = true;
+      });
+
+      Fluttertoast.showToast(
+        msg: '🔓 Porta liberada com sucesso',
+        backgroundColor: AppTheme.accent,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+
+      await Future.delayed(const Duration(seconds: 3));
+
+      if (mounted) {
+        setState(() => _isUnlocked = false);
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      _pulseController.stop();
+      _pulseController.reset();
+
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = false;
+      });
+
+      Fluttertoast.showToast(
+        msg: error.message,
+        backgroundColor: Colors.red.shade700,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      _pulseController.stop();
+      _pulseController.reset();
+
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = false;
+      });
+
+      Fluttertoast.showToast(
+        msg: 'Erro inesperado ao liberar porta',
+        backgroundColor: Colors.red.shade700,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    }
   }
 
   @override
@@ -74,7 +127,10 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 14,
+              ),
               decoration: BoxDecoration(
                 color: _isUnlocked ? AppTheme.accent : AppTheme.darkText,
                 borderRadius: BorderRadius.circular(28),
@@ -110,10 +166,10 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
                   const SizedBox(width: 8),
                   Text(
                     _isUnlocking
-                        ? 'Verificando...'
+                        ? 'Liberando...'
                         : _isUnlocked
-                        ? 'Porta Aberta'
-                        : 'Liberar Porta',
+                            ? 'Porta Aberta'
+                            : 'Liberar Porta',
                     style: GoogleFonts.outfit(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,

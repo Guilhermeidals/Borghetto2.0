@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:uuid/uuid.dart';
 
 import 'api_exception.dart';
 import 'auth_session.dart';
@@ -19,6 +21,72 @@ class ApiClient {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
+  static const String _deviceIdStorageKey = 'app_installation_device_id';
+
+  final Uuid _uuid = const Uuid();
+
+  Map<String, String>? _cachedAuditHeaders;
+
+
+  Future<String> _getOrCreateDeviceId() async {
+    final savedDeviceId = await _storage.read(
+      key: _deviceIdStorageKey,
+    );
+
+    if (savedDeviceId != null && savedDeviceId.trim().isNotEmpty) {
+      return savedDeviceId.trim();
+    }
+
+    final newDeviceId = _uuid.v4();
+
+    await _storage.write(
+      key: _deviceIdStorageKey,
+      value: newDeviceId,
+    );
+
+    return newDeviceId;
+  }
+
+  String _getPlatformName() {
+    if (Platform.isAndroid) {
+      return 'android';
+    }
+
+    if (Platform.isIOS) {
+      return 'ios';
+    }
+
+    return Platform.operatingSystem;
+  }
+
+  Future<Map<String, String>> _getAuditHeaders() async {
+    final cachedHeaders = _cachedAuditHeaders;
+
+    if (cachedHeaders != null) {
+      return cachedHeaders;
+    }
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    final deviceId = await _getOrCreateDeviceId();
+
+    final version = packageInfo.version.trim();
+    final buildNumber = packageInfo.buildNumber.trim();
+
+    final appVersion = buildNumber.isEmpty
+        ? version
+        : '$version+$buildNumber';
+
+    final headers = <String, String>{
+      'X-Device-Id': deviceId,
+      'X-App-Version': appVersion,
+      'X-Platform': _getPlatformName(),
+    };
+
+    _cachedAuditHeaders = headers;
+
+    return headers;
+  }
+
   late final Dio _dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
@@ -32,13 +100,28 @@ class ApiClient {
   )..interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await getToken();
+          try {
+            final token = await getToken();
 
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+
+            final auditHeaders = await _getAuditHeaders();
+
+            options.headers.addAll(auditHeaders);
+
+            handler.next(options);
+          } catch (error, stackTrace) {
+            print(
+              'Erro ao preparar headers da requisição: '
+              '$error\n$stackTrace',
+            );
+
+            
+            // Os dados de auditoria não devem impedir a requisição.
+            handler.next(options);
           }
-
-          handler.next(options);
         },
       ),
     );
@@ -191,6 +274,34 @@ class ApiClient {
       return updated;
     } on DioException catch (e) {
       throw _handleDioError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> openDoor() async {
+    try {
+      final response = await _dio.post('/access/open-door');
+
+      final data = response.data;
+
+      if (data is Map<String, dynamic>) {
+        return data;
+      }
+
+      throw ApiException('Resposta inválida ao liberar porta.');
+    } on DioException catch (error) {
+      final data = error.response?.data;
+
+      if (data is Map && data['message'] != null) {
+        throw ApiException(data['message'].toString());
+      }
+
+      throw ApiException('Erro ao liberar porta.');
+    } catch (error) {
+      if (error is ApiException) {
+        rethrow;
+      }
+
+      throw ApiException('Erro inesperado ao liberar porta.');
     }
   }
 

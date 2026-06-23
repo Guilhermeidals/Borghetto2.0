@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+
+import '../../../core/api/api_client.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../theme/app_theme.dart';
 
 class DoorAccessWidget extends StatefulWidget {
@@ -44,28 +47,70 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
 
   Future<void> _handleUnlock() async {
     if (_isUnlocking) return;
+
     setState(() => _isUnlocking = true);
     _pulseController.repeat();
 
-    // TODO: Replace with local_auth Face ID + physical door API call
-    await Future.delayed(const Duration(milliseconds: 1800));
+    try {
+      await ApiClient.instance.openDoor();
 
-    _pulseController.stop();
-    _pulseController.reset();
-    setState(() {
-      _isUnlocking = false;
-      _isUnlocked = true;
-    });
+      if (!mounted) return;
 
-    Fluttertoast.showToast(
-      msg: '🔓 Acesso liberado — 30 segundos',
-      backgroundColor: AppTheme.accent,
-      textColor: Colors.white,
-      toastLength: Toast.LENGTH_LONG,
-    );
+      _pulseController.stop();
+      _pulseController.reset();
 
-    await Future.delayed(const Duration(seconds: 5));
-    if (mounted) setState(() => _isUnlocked = false);
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = true;
+      });
+
+      Fluttertoast.showToast(
+        msg: '🔓 Porta liberada com sucesso',
+        backgroundColor: AppTheme.accent,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+
+      await Future.delayed(const Duration(seconds: 5));
+
+      if (mounted) {
+        setState(() => _isUnlocked = false);
+      }
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      _pulseController.stop();
+      _pulseController.reset();
+
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = false;
+      });
+
+      Fluttertoast.showToast(
+        msg: error.message,
+        backgroundColor: Colors.red.shade700,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      _pulseController.stop();
+      _pulseController.reset();
+
+      setState(() {
+        _isUnlocking = false;
+        _isUnlocked = false;
+      });
+
+      Fluttertoast.showToast(
+        msg: 'Erro inesperado ao liberar porta',
+        backgroundColor: Colors.red.shade700,
+        textColor: Colors.white,
+        toastLength: Toast.LENGTH_LONG,
+      );
+    }
   }
 
   @override
@@ -206,7 +251,7 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
                   ? 'Verificando Face ID...'
                   : _isUnlocked
                   ? 'Bem Vindo! A porta está aberta'
-                  : 'Autentique para libera a entrada',
+                  : 'Toque para liberar a entrada',
               style: GoogleFonts.outfit(
                 fontSize: 13,
                 color: _isUnlocked ? AppTheme.accent : AppTheme.mutedText,
