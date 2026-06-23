@@ -12,6 +12,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/auth_session.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
+import '../../../core/utils/image_upload_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -462,7 +463,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   });
 
   try {
-    final preparedImage = await _prepareImageForUpload(image);
+    final preparedImage = await ImageUploadHelper.prepareXFileForUpload(image);
 
     final updatedSession = await ApiClient.instance.uploadSelfie(
       facialUserId: facialUserId,
@@ -851,28 +852,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       return false;
     }
-  }
-
-  Future<File> _prepareImageForUpload(XFile image) async {
-    final originalFile = File(image.path);
-
-    final targetPath =
-        '${image.path}_fixed_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    final fixedImage = await FlutterImageCompress.compressAndGetFile(
-      originalFile.absolute.path,
-      targetPath,
-      quality: 92,
-      format: CompressFormat.jpeg,
-      autoCorrectionAngle: true,
-      keepExif: false,
-    );
-
-    if (fixedImage == null) {
-      return originalFile;
-    }
-
-    return File(fixedImage.path);
   }
 
   @override
@@ -1338,17 +1317,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildMenuSection(BuildContext context) {
     final menuItems = [
       {
-        'icon': Icons.history_rounded,
-        'label': 'Histórico de acesso',
-        'subtitle': 'Veja os registros de acesso',
-        'onTap': () => context.push(AppRoutes.accessLogScreen),
-        'accent': true,
-      },
-      {
-        'icon': Icons.credit_card_outlined,
-        'label': 'Carteirinha digital',
-        'subtitle': 'Veja seu cartão de membro',
-        'onTap': () => context.go(AppRoutes.digitalMembershipCardScreen),
+        'icon': Icons.family_restroom_rounded,
+        'label': 'Familiares',
+        'subtitle': 'Cadastre e gerencie seus dependentes',
+        'onTap': () => context.push(AppRoutes.dependentsScreen),
         'accent': false,
       },
       {

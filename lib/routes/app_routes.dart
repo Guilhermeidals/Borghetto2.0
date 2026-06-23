@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/api/api_client.dart';
+import '../features/dependents/screens/dependents_screen.dart';
 import '../presentation/access_log_screen/access_log_screen.dart';
 import '../presentation/digital_membership_card_screen/digital_membership_card_screen.dart';
 import '../presentation/home_screen/home_screen.dart';
@@ -17,6 +18,7 @@ class AppRoutes {
       '/digital-membership-card-screen';
   static const String profileScreen = '/profile-screen';
   static const String accessLogScreen = '/access-log-screen';
+  static const String dependentsScreen = '/dependents';
 }
 
 final GoRouter appRouter = GoRouter(
@@ -116,6 +118,10 @@ final GoRouter appRouter = GoRouter(
               path: AppRoutes.profileScreen,
               pageBuilder: (context, state) =>
                   const NoTransitionPage(child: ProfileScreen()),
+            ),
+            GoRoute(
+              path: AppRoutes.dependentsScreen,
+              builder: (context, state) => const DependentsScreen(),
             ),
           ],
         ),

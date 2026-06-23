@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
+import '../../features/dependents/models/app_dependent.dart';
 
 import 'api_exception.dart';
 import 'auth_session.dart';
@@ -131,22 +134,22 @@ class ApiClient {
   }
 
   String resolveFileUrl(String? path) {
-  if (path == null || path.trim().isEmpty) {
-    return '';
+    if (path == null || path.trim().isEmpty) {
+      return '';
+    }
+
+    final value = path.trim();
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    if (value.startsWith('/')) {
+      return '$baseUrl$value';
+    }
+
+    return '$baseUrl/$value';
   }
-
-  final value = path.trim();
-
-  if (value.startsWith('http://') || value.startsWith('https://')) {
-    return value;
-  }
-
-  if (value.startsWith('/')) {
-    return '$baseUrl$value';
-  }
-
-  return '$baseUrl/$value';
-}
 
   Future<AuthSession?> getSavedSession() async {
     final raw = await _storage.read(key: 'auth_session');
@@ -457,6 +460,156 @@ class ApiClient {
     }
   }
 
+  Future<List<AppDependent>> getDependents(int userId) async {
+  try {
+    final response = await _dio.get('/app-users/$userId/dependents');
+
+    final data = response.data;
+
+    final rawDependents = data is Map<String, dynamic>
+        ? data['dependents']
+        : null;
+
+    if (rawDependents is! List) {
+      return [];
+    }
+
+    return rawDependents
+        .whereType<Map<String, dynamic>>()
+        .map(AppDependent.fromJson)
+        .toList();
+  } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (_) {
+      throw ApiException('Erro ao buscar familiares');
+    }
+  }
+
+  Future<AppDependent> createDependent({
+    required int userId,
+    required String name,
+    required String cpf,
+    required String birthDate,
+    required String relationship,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/app-users/$userId/dependents',
+        data: {
+          'name': name.trim(),
+          'cpf': cpf.replaceAll(RegExp(r'\D'), ''),
+          'birth_date': birthDate.trim(),
+          'relationship': relationship,
+        },
+      );
+
+      final data = response.data;
+
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Resposta inválida ao criar familiar');
+      }
+
+      final rawDependent = data['dependent'];
+
+      if (rawDependent is! Map<String, dynamic>) {
+        throw ApiException('Dados do familiar não encontrados');
+      }
+
+      return AppDependent.fromJson(rawDependent);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao criar familiar');
+    }
+  }
+
+  Future<AppDependent> updateDependent({
+    required int userId,
+    required int dependentId,
+    required String name,
+    required String cpf,
+    required String birthDate,
+    required String relationship,
+    required bool active,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/app-users/$userId/dependents/$dependentId',
+        data: {
+          'name': name.trim(),
+          'cpf': cpf.replaceAll(RegExp(r'\D'), ''),
+          'birth_date': birthDate.trim(),
+          'relationship': relationship,
+          'active': active,
+        },
+      );
+
+      final data = response.data;
+
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Resposta inválida ao atualizar familiar');
+      }
+
+      final rawDependent = data['dependent'];
+
+      if (rawDependent is! Map<String, dynamic>) {
+        throw ApiException('Dados do familiar não encontrados');
+      }
+
+      return AppDependent.fromJson(rawDependent);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao atualizar familiar');
+    }
+  }
+
+  Future<void> deleteDependent({
+    required int userId,
+    required int dependentId,
+  }) async {
+    try {
+      await _dio.delete('/app-users/$userId/dependents/$dependentId');
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (_) {
+      throw ApiException('Erro ao remover familiar');
+    }
+  }
+
+  Future<void> uploadDependentFace({
+    required int userId,
+    required int dependentId,
+    required File imageFile,
+  }) async {
+    try {
+      final fileName = imageFile.path.split('/').last;
+
+      final formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+      });
+
+      await _dio.post(
+        '/app-users/$userId/dependents/$dependentId/face',
+        data: formData,
+        options: Options(
+          contentType: 'multipart/form-data',
+        ),
+      );
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (_) {
+      throw ApiException('Erro ao enviar foto do familiar');
+    }
+  }
+
   String _onlyDigits(String value) {
     return value.replaceAll(RegExp(r'[^0-9]'), '');
   }
@@ -481,4 +634,76 @@ class ApiClient {
 
     return ApiException(message, statusCode: statusCode);
   }
+
+  // Future<Uint8List> getFacialUserPhotoBytes(int facialUserId) async {
+      // final response = await _dio.get(
+      //   '/facial/users/$facialUserId/face',
+      //   options: Options(
+      //     responseType: ResponseType.bytes,
+      //   ),
+      // );
+
+  //     final data = response.data;
+
+  //     if (data == null) {
+  //       throw ApiException('Foto não encontrada');
+  //     }
+
+  //     if (data is Uint8List) {
+  //       return data;
+  //     }
+
+  //     if (data is List<int>) {
+  //       return Uint8List.fromList(data);
+  //     }
+
+  //     throw ApiException('Formato de foto inválido');
+  //   } on DioException catch (e) {
+  //     throw _handleDioError(e);
+  //   } catch (_) {
+  //     throw ApiException('Erro ao carregar foto facial');
+  //   }
+  // }
+
+  Future<Uint8List> getFacialUserPhotoBytes(int facialUserId) async {
+    try {
+      final response = await _dio.get(
+        '/facial/users/$facialUserId/face',
+        options: Options(
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      final data = response.data;
+
+      if (data == null) {
+        throw ApiException('Foto não encontrada');
+      }
+
+      if (data is Uint8List) {
+        return data;
+      }
+
+      if (data is List<int>) {
+        return Uint8List.fromList(data);
+      }
+
+      throw ApiException('Formato de foto inválido');
+    } on DioException catch (e) {
+      debugPrint('ERRO API FOTO FACIAL');
+      debugPrint('URL: ${e.requestOptions.uri}');
+      debugPrint('STATUS: ${e.response?.statusCode}');
+      debugPrint('DATA: ${e.response?.data}');
+      debugPrint('MESSAGE: ${e.message}');
+
+      throw ApiException(
+        'Erro ao carregar foto facial: ${e.response?.statusCode ?? e.message}',
+      );
+    } catch (e) {
+      debugPrint('ERRO GERAL FOTO FACIAL: $e');
+
+      throw ApiException('Erro ao carregar foto facial');
+    }
+  }
+
 }
