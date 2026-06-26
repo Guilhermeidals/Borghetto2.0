@@ -19,6 +19,11 @@ class AuthSession {
     this.state,
     this.photoUrl,
     this.accessStatus,
+    this.approved = false,
+    this.approvalStatus = 'pending',
+    this.reviewedAt,
+    this.reviewedBy,
+    this.reviewNote,
   });
 
   final String token;
@@ -44,6 +49,26 @@ class AuthSession {
 
   final String? photoUrl;
   final String? accessStatus;
+
+  final bool approved;
+  final String approvalStatus;
+  final String? reviewedAt;
+  final int? reviewedBy;
+  final String? reviewNote;
+
+  bool get isAdmin => role == 'admin';
+
+  bool get isApproved =>
+      approved == true && approvalStatus.toLowerCase() == 'approved';
+
+  bool get isPendingApproval =>
+      approved == false && approvalStatus.toLowerCase() == 'pending';
+
+  bool get isRejected =>
+      approved == false && approvalStatus.toLowerCase() == 'rejected';
+
+  bool get isBlocked =>
+      approved == false && approvalStatus.toLowerCase() == 'blocked';
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     final userRaw = json['user'];
@@ -79,6 +104,16 @@ class AuthSession {
 
       photoUrl: (user['photoUrl'] ?? user['photo_url'])?.toString(),
       accessStatus: (user['accessStatus'] ?? user['access_status'])?.toString(),
+
+      approved: _parseBool(user['approved']) ?? false,
+      approvalStatus:
+          (user['approvalStatus'] ?? user['approval_status'])?.toString() ??
+              'pending',
+      reviewedAt: (user['reviewedAt'] ?? user['reviewed_at'])?.toString(),
+      reviewedBy: _parseNullableInt(
+        user['reviewedBy'] ?? user['reviewed_by'],
+      ),
+      reviewNote: (user['reviewNote'] ?? user['review_note'])?.toString(),
     );
   }
 
@@ -116,6 +151,19 @@ class AuthSession {
 
         'accessStatus': accessStatus,
         'access_status': accessStatus,
+
+        'approved': approved,
+        'approval_status': approvalStatus,
+        'approvalStatus': approvalStatus,
+
+        'reviewed_at': reviewedAt,
+        'reviewedAt': reviewedAt,
+
+        'reviewed_by': reviewedBy,
+        'reviewedBy': reviewedBy,
+
+        'review_note': reviewNote,
+        'reviewNote': reviewNote,
       },
     };
   }
@@ -140,6 +188,11 @@ class AuthSession {
     String? state,
     String? photoUrl,
     String? accessStatus,
+    bool? approved,
+    String? approvalStatus,
+    String? reviewedAt,
+    int? reviewedBy,
+    String? reviewNote,
   }) {
     return AuthSession(
       token: token ?? this.token,
@@ -161,6 +214,11 @@ class AuthSession {
       state: state ?? this.state,
       photoUrl: photoUrl ?? this.photoUrl,
       accessStatus: accessStatus ?? this.accessStatus,
+      approved: approved ?? this.approved,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      reviewedAt: reviewedAt ?? this.reviewedAt,
+      reviewedBy: reviewedBy ?? this.reviewedBy,
+      reviewNote: reviewNote ?? this.reviewNote,
     );
   }
 
@@ -202,11 +260,23 @@ class AuthSession {
     }
 
     if (value is String) {
-      if (value.toLowerCase() == 'true') {
+      final normalized = value.toLowerCase().trim();
+
+      if (normalized == 'true' || normalized == 't' || normalized == '1') {
         return true;
       }
 
-      if (value.toLowerCase() == 'false') {
+      if (normalized == 'false' || normalized == 'f' || normalized == '0') {
+        return false;
+      }
+    }
+
+    if (value is int) {
+      if (value == 1) {
+        return true;
+      }
+
+      if (value == 0) {
         return false;
       }
     }

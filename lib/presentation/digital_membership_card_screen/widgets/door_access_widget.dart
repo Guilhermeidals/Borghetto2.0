@@ -66,7 +66,7 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
 
       Fluttertoast.showToast(
         msg: '🔓 Porta liberada com sucesso',
-        backgroundColor: AppTheme.accent,
+        backgroundColor: Colors.green.shade700,
         textColor: Colors.white,
         toastLength: Toast.LENGTH_LONG,
       );
@@ -164,7 +164,7 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         color: _isUnlocked
-                            ? AppTheme.accent
+                            ? Colors.green.shade700
                             : AppTheme.mutedText,
                       ),
                     ),
@@ -191,7 +191,7 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
                           height: 80,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppTheme.accent.withOpacity(
+                            color: Colors.green.shade700.withOpacity(
                               _pulseOpacity.value,
                             ),
                           ),
@@ -208,12 +208,12 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
                     height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: _isUnlocked ? AppTheme.accent : AppTheme.darkText,
+                      color: _isUnlocked ? Colors.green.shade700 : AppTheme.darkText,
                       boxShadow: [
                         BoxShadow(
                           color:
                               (_isUnlocked
-                                      ? AppTheme.accent
+                                      ? Colors.green.shade700
                                       : AppTheme.darkText)
                                   .withAlpha(64),
                           blurRadius: 20,
@@ -254,7 +254,7 @@ class _DoorAccessWidgetState extends State<DoorAccessWidget>
                   : 'Toque para liberar a entrada',
               style: GoogleFonts.outfit(
                 fontSize: 13,
-                color: _isUnlocked ? AppTheme.accent : AppTheme.mutedText,
+                color: _isUnlocked ? Colors.green.shade700 : AppTheme.mutedText,
                 fontWeight: _isUnlocked ? FontWeight.w600 : FontWeight.w400,
               ),
               textAlign: TextAlign.center,

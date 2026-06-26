@@ -68,7 +68,7 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
 
       Fluttertoast.showToast(
         msg: '🔓 Porta liberada com sucesso',
-        backgroundColor: AppTheme.accent,
+        backgroundColor: Colors.green.shade700,
         textColor: Colors.white,
         toastLength: Toast.LENGTH_LONG,
       );
@@ -132,11 +132,11 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
                 vertical: 14,
               ),
               decoration: BoxDecoration(
-                color: _isUnlocked ? AppTheme.accent : AppTheme.darkText,
+                color: _isUnlocked ? Colors.green.shade700 : AppTheme.darkText,
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isUnlocked ? AppTheme.accent : AppTheme.darkText)
+                    color: (_isUnlocked ? Colors.green.shade700 : AppTheme.darkText)
                         .withAlpha(77),
                     blurRadius: 16,
                     offset: const Offset(0, 6),

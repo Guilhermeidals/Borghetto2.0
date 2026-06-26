@@ -56,10 +56,11 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
 
   void _handleGetStarted() {
     setState(() {
+      _isLogin = true;
       _showForm = true;
     });
 
-    _formSlideController.forward();
+    _formSlideController.forward(from: 0);
   }
 
   void _handleAuthSuccess() {
@@ -69,6 +70,19 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   void _toggleMode() {
     setState(() {
       _isLogin = !_isLogin;
+    });
+  }
+
+  void _hideForm() {
+    _formSlideController.reverse().then((_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _showForm = false;
+        _isLogin = true;
+      });
     });
   }
 
@@ -87,96 +101,90 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
   }
 
   Widget _buildPhoneLayout() {
-    final height = MediaQuery.of(context).size.height;
-    final formHeight = _isLogin ? height * 0.60 : height * 0.84;
-    final heroBottom = _showForm ? formHeight - 18 : 0.0;
-
     return Stack(
       children: [
-        AnimatedPositioned(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: heroBottom,
+        Positioned.fill(
           child: SplashHeroSectionWidget(
             showForm: _showForm,
             onGetStarted: _handleGetStarted,
           ),
         ),
-        if (_showForm)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: formHeight,
-            child: FadeTransition(
-              opacity: _formFadeAnimation,
-              child: SlideTransition(
-                position: _formSlideAnimation,
-                child: AuthFormWidget(
-                  isLogin: _isLogin,
-                  onToggleMode: _toggleMode,
-                  onAuthSuccess: _handleAuthSuccess,
-                ),
-              ),
-            ),
-          ),
+
+        if (_showForm) _buildFormOverlay(isTablet: false),
       ],
     );
   }
 
   Widget _buildTabletLayout() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 980),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: !_showForm
-                ? ConstrainedBox(
-                    key: const ValueKey('tablet-hero-only'),
-                    constraints: const BoxConstraints(maxWidth: 720),
-                    child: SplashHeroSectionWidget(
-                      showForm: _showForm,
-                      onGetStarted: _handleGetStarted,
-                    ),
-                  )
-                : Row(
-                    key: const ValueKey('tablet-auth-layout'),
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 520),
-                          child: SplashHeroSectionWidget(
-                            showForm: _showForm,
-                            onGetStarted: _handleGetStarted,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 34),
-                      Expanded(
-                        child: FadeTransition(
-                          opacity: _formFadeAnimation,
-                          child: SlideTransition(
-                            position: _formSlideAnimation,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 480),
-                              child: AuthFormWidget(
-                                isLogin: _isLogin,
-                                onToggleMode: _toggleMode,
-                                onAuthSuccess: _handleAuthSuccess,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+    return Stack(
+      children: [
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: SplashHeroSectionWidget(
+              showForm: _showForm,
+              onGetStarted: _handleGetStarted,
+            ),
           ),
+        ),
+
+        if (_showForm) _buildFormOverlay(isTablet: true),
+      ],
+    );
+  }
+
+  Widget _buildFormOverlay({required bool isTablet}) {
+    final size = MediaQuery.of(context).size;
+
+    final maxWidth = isTablet ? 430.0 : 420.0;
+    final horizontalPadding = isTablet ? 32.0 : 18.0;
+    final verticalPadding = isTablet ? 32.0 : 18.0;
+
+    final maxHeight = isTablet
+        ? size.height * 0.88
+        : (_isLogin ? size.height * 0.78 : size.height * 0.92);
+
+    return Positioned.fill(
+      child: FadeTransition(
+        opacity: _formFadeAnimation,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: isTablet ? _hideForm : null,
+                child: Container(
+                  color: AppTheme.backgroundLight.withAlpha(
+                    isTablet ? 226 : 238,
+                  ),
+                ),
+              ),
+            ),
+
+            SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: verticalPadding,
+                  ),
+                  child: SlideTransition(
+                    position: _formSlideAnimation,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: maxWidth,
+                        maxHeight: maxHeight,
+                      ),
+                      child: AuthFormWidget(
+                        isLogin: _isLogin,
+                        onToggleMode: _toggleMode,
+                        onAuthSuccess: _handleAuthSuccess,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

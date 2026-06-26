@@ -15,7 +15,12 @@ import '../../theme/app_theme.dart';
 import '../../../core/utils/image_upload_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({
+    super.key,
+    this.openPhotoPicker = false,
+  });
+
+  final bool openPhotoPicker;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -32,11 +37,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSavingProfile = false;
 
   int _photoVersion = 0;
+  bool _autoPhotoPickerOpened = false;
 
   @override
   void initState() {
     super.initState();
     _loadSession();
+  }
+
+  void _openPhotoPickerIfRequested() {
+    if (_autoPhotoPickerOpened) {
+      return;
+    }
+
+    if (!widget.openPhotoPicker) {
+      return;
+    }
+
+    if (_isLoadingSession) {
+      return;
+    }
+
+    _autoPhotoPickerOpened = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showPhotoOptions();
+    });
   }
 
   Future<void> _loadSession() async {
@@ -59,6 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _session = freshSession;
         _isLoadingSession = false;
       });
+      _openPhotoPickerIfRequested();
     } catch (_) {
       if (!mounted) return;
 
@@ -66,6 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _session = savedSession;
         _isLoadingSession = false;
       });
+      _openPhotoPickerIfRequested();
 
       if (savedSession == null) {
         _showSnackBar(

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
@@ -8,6 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
 import '../../features/dependents/models/app_dependent.dart';
+import '../../features/admin/models/admin_app_user.dart';
+import '../../features/admin/models/admin_user_detail.dart';
 
 import 'api_exception.dart';
 import 'auth_session.dart';
@@ -635,36 +636,109 @@ class ApiClient {
     return ApiException(message, statusCode: statusCode);
   }
 
-  // Future<Uint8List> getFacialUserPhotoBytes(int facialUserId) async {
-      // final response = await _dio.get(
-      //   '/facial/users/$facialUserId/face',
-      //   options: Options(
-      //     responseType: ResponseType.bytes,
-      //   ),
-      // );
+  Future<List<AdminAppUser>> getAdminAppUsers({
+    String status = 'pending',
+    String? search,
+  }) async {
+    try {
+      final queryParameters = <String, dynamic>{
+        'status': status,
+      };
 
-  //     final data = response.data;
+      final cleanSearch = search?.trim();
 
-  //     if (data == null) {
-  //       throw ApiException('Foto não encontrada');
-  //     }
+      if (cleanSearch != null && cleanSearch.isNotEmpty) {
+        queryParameters['search'] = cleanSearch;
+      }
 
-  //     if (data is Uint8List) {
-  //       return data;
-  //     }
+      final response = await _dio.get(
+        '/admin/app-users',
+        queryParameters: queryParameters,
+      );
 
-  //     if (data is List<int>) {
-  //       return Uint8List.fromList(data);
-  //     }
+      final data = response.data;
 
-  //     throw ApiException('Formato de foto inválido');
-  //   } on DioException catch (e) {
-  //     throw _handleDioError(e);
-  //   } catch (_) {
-  //     throw ApiException('Erro ao carregar foto facial');
-  //   }
-  // }
+      final rawUsers = data is Map<String, dynamic> ? data['users'] : null;
 
+      if (rawUsers is! List) {
+        return [];
+      }
+
+      return rawUsers
+          .whereType<Map<String, dynamic>>()
+          .map(AdminAppUser.fromJson)
+          .toList();
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (_) {
+      throw ApiException('Erro ao buscar usuários');
+    }
+  }
+  
+
+  Future<AdminAppUser> updateAdminUserApproval({
+    required int userId,
+    required bool approved,
+    String? reviewNote,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'approved': approved,
+      };
+
+      final cleanReviewNote = reviewNote?.trim();
+
+      if (cleanReviewNote != null && cleanReviewNote.isNotEmpty) {
+        data['review_note'] = cleanReviewNote;
+      }
+
+      final response = await _dio.put(
+        '/admin/app-users/$userId/approval',
+        data: data,
+      );
+
+      final responseData = response.data;
+
+      final rawUser = responseData is Map<String, dynamic>
+          ? responseData['user']
+          : null;
+
+      if (rawUser is! Map<String, dynamic>) {
+        throw ApiException('Resposta inválida ao atualizar aprovação');
+      }
+
+      return AdminAppUser.fromJson(rawUser);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao atualizar aprovação do usuário');
+    }
+  }
+
+  Future<AdminUserDetail> getAdminUserDetail({
+    required int userId,
+  }) async {
+    try {
+      final response = await _dio.get('/admin/app-users/$userId');
+
+      final data = response.data;
+
+      if (data is! Map<String, dynamic>) {
+        throw ApiException('Resposta inválida ao buscar detalhes do usuário');
+      }
+
+      return AdminUserDetail.fromJson(data);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao buscar detalhes do usuário');
+    }
+  }
+  
   Future<Uint8List> getFacialUserPhotoBytes(int facialUserId) async {
     try {
       final response = await _dio.get(

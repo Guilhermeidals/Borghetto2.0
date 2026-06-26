@@ -3,9 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
+import '../../core/api/api_client.dart';
+import '../../core/api/auth_session.dart';
 import './widgets/door_unlock_fab_widget.dart';
 import './widgets/home_app_bar_widget.dart';
 import './widgets/points_hero_widget.dart';
+import './widgets/home_account_alert_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +21,49 @@ class _HomeScreenState extends State<HomeScreen> {
   static const int _clubPoints = 0;
   static const int _nextRewardPoints = 100;
   static const String _clubTier = 'Cliente Borghetto';
+
+  AuthSession? _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSession();
+  }
+
+  Future<void> _loadSession() async {
+    AuthSession? session = await ApiClient.instance.getSavedSession();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _session = session;
+    });
+
+    try {
+      final freshSession = await ApiClient.instance.me();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _session = freshSession;
+      });
+    } catch (_) {
+      // Mantém a sessão salva caso o /auth/me falhe.
+    }
+  }
+
+  void _openPhotoUpload() {
+    context.go(
+      AppRoutes.profileScreen,
+      extra: {
+        'openPhotoPicker': true,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +82,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     onAvatarTap: () {
                       context.go(AppRoutes.profileScreen);
                     },
+                  ),
+                ),
+                if (_session != null)
+                SliverToBoxAdapter(
+                  child: HomeAccountAlertWidget(
+                    session: _session!,
+                    onSendPhotoPressed: _openPhotoUpload,
                   ),
                 ),
                 SliverToBoxAdapter(

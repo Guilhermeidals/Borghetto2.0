@@ -58,8 +58,24 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    final size = MediaQuery.of(context).size;
+    final width = size.width;
+    final height = size.height;
+
     final isTablet = width >= 600;
+    final isCompactHeight = height < 720;
+
+    final horizontalPadding = isTablet ? 10.0 : 24.0;
+    final topPadding = isTablet ? 8.0 : 24.0;
+    final bottomPadding = isTablet ? 8.0 : 0.0;
+
+    final availableHeight = height -
+        MediaQuery.of(context).padding.top -
+        MediaQuery.of(context).padding.bottom -
+        topPadding -
+        bottomPadding;
+
+    final contentWidth = isTablet ? 520.0 : width - (horizontalPadding * 2);
 
     return FadeTransition(
       opacity: _fadeAnim,
@@ -67,28 +83,48 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
         position: _slideAnim,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            isTablet ? 12 : 24,
-            isTablet ? 12 : 24,
-            isTablet ? 12 : 24,
-            isTablet ? 12 : 0,
+            horizontalPadding,
+            topPadding,
+            horizontalPadding,
+            bottomPadding,
           ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isTablet ? 520 : double.infinity,
-              ),
-              child: Column(
-                mainAxisAlignment: widget.showForm
-                    ? MainAxisAlignment.center
-                    : MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBrandLockup(isTablet: isTablet),
-                  SizedBox(height: isTablet ? 28 : 26),
-                  _buildBrandFeature(isTablet: isTablet),
-                  SizedBox(height: isTablet ? 28 : 26),
-                  if (!widget.showForm) _buildTaglineAndCta(),
-                ],
+          child: Align(
+            alignment: Alignment.center,
+            child: SizedBox(
+              width: double.infinity,
+              height: availableHeight,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildBrandLockup(
+                        isTablet: isTablet,
+                        isCompactHeight: isCompactHeight,
+                      ),
+                      SizedBox(
+                        height: isCompactHeight ? 14 : (isTablet ? 28 : 26),
+                      ),
+                      _buildBrandFeature(
+                        isTablet: isTablet,
+                        isCompactHeight: isCompactHeight,
+                      ),
+                      if (!widget.showForm) ...[
+                        SizedBox(
+                          height: isCompactHeight ? 14 : (isTablet ? 28 : 26),
+                        ),
+                        _buildTaglineAndCta(
+                          isCompactHeight: isCompactHeight,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -97,21 +133,27 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
     );
   }
 
-  Widget _buildBrandLockup({required bool isTablet}) {
+  Widget _buildBrandLockup({
+    required bool isTablet,
+    required bool isCompactHeight,
+  }) {
+    final titleSize = isCompactHeight ? 52.0 : (isTablet ? 70.0 : 64.0);
+    final subtitleSize = isCompactHeight ? 25.0 : (isTablet ? 34.0 : 31.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Borghetto',
           style: GoogleFonts.outfit(
-            fontSize: isTablet ? 70 : 64,
+            fontSize: titleSize,
             fontWeight: FontWeight.w900,
             color: AppTheme.darkText,
             height: 0.92,
-            letterSpacing: -2.6,
+            letterSpacing: -2.3,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: isCompactHeight ? 3 : 6),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -121,17 +163,20 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.outfit(
-                  fontSize: isTablet ? 34 : 31,
+                  fontSize: subtitleSize,
                   fontWeight: FontWeight.w900,
                   color: AppTheme.darkText,
                   height: 0.95,
-                  letterSpacing: -1.8,
+                  letterSpacing: -1.5,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: isCompactHeight ? 7 : 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompactHeight ? 10 : 13,
+                vertical: isCompactHeight ? 5 : 7,
+              ),
               decoration: BoxDecoration(
                 color: AppTheme.caramel,
                 borderRadius: AppTheme.radiusPill,
@@ -146,7 +191,7 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
               child: Text(
                 'Clube',
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: isCompactHeight ? 11 : 13,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
@@ -158,24 +203,29 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
     );
   }
 
-  Widget _buildBrandFeature({required bool isTablet}) {
+  Widget _buildBrandFeature({
+    required bool isTablet,
+    required bool isCompactHeight,
+  }) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 22 : 20),
+      padding: EdgeInsets.all(isCompactHeight ? 15 : (isTablet ? 22 : 20)),
       decoration: BoxDecoration(
         color: AppTheme.forest,
-        borderRadius: AppTheme.radiusExtraLarge,
+        borderRadius: isCompactHeight
+            ? AppTheme.radiusLarge
+            : AppTheme.radiusExtraLarge,
         boxShadow: AppTheme.premiumShadow,
       ),
       child: Stack(
         children: [
           Positioned(
-            right: -46,
-            top: -76,
+            right: isCompactHeight ? -34 : -46,
+            top: isCompactHeight ? -56 : -76,
             child: Text(
               'B',
               style: GoogleFonts.outfit(
-                fontSize: isTablet ? 220 : 190,
+                fontSize: isCompactHeight ? 150 : (isTablet ? 220 : 190),
                 height: 1,
                 fontWeight: FontWeight.w900,
                 color: AppTheme.sand.withAlpha(18),
@@ -183,54 +233,60 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
             ),
           ),
           Positioned(
-            right: 18,
-            top: 16,
+            right: isCompactHeight ? 10 : 18,
+            top: isCompactHeight ? 10 : 16,
             child: _SparkIcon(
-              size: isTablet ? 42 : 36,
+              size: isCompactHeight ? 30 : (isTablet ? 42 : 36),
               color: AppTheme.sand.withAlpha(150),
             ),
           ),
           Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildIconBadge(),
-              const SizedBox(height: 18),
+              _buildIconBadge(isCompactHeight: isCompactHeight),
+              SizedBox(height: isCompactHeight ? 10 : 18),
               Text(
                 'O sabor de um novo dia.',
                 style: GoogleFonts.outfit(
-                  fontSize: isTablet ? 29 : 27,
+                  fontSize: isCompactHeight ? 22 : (isTablet ? 29 : 27),
                   height: 1.05,
                   fontWeight: FontWeight.w900,
                   color: AppTheme.lightText,
                   letterSpacing: -0.8,
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: isCompactHeight ? 6 : 10),
               Text(
                 'Acesso ao clube, carteirinha digital e entrada facilitada em uma experiência feita para ser leve, próxima e acolhedora.',
+                maxLines: isCompactHeight ? 1 : 4,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  height: 1.45,
+                  fontSize: isCompactHeight ? 12 : 14,
+                  height: isCompactHeight ? 1.25 : 1.45,
                   fontWeight: FontWeight.w500,
                   color: AppTheme.sand.withAlpha(220),
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isCompactHeight ? 12 : 20),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: const [
+                spacing: isCompactHeight ? 6 : 8,
+                runSpacing: isCompactHeight ? 6 : 8,
+                children: [
                   _FeaturePill(
                     icon: Icons.local_cafe_rounded,
                     label: 'Bistrô',
+                    compact: isCompactHeight,
                   ),
                   _FeaturePill(
                     icon: Icons.storefront_rounded,
                     label: 'Mercado',
+                    compact: isCompactHeight,
                   ),
                   _FeaturePill(
                     icon: Icons.lock_open_rounded,
                     label: 'Acesso',
+                    compact: isCompactHeight,
                   ),
                 ],
               ),
@@ -241,21 +297,21 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
     );
   }
 
-  Widget _buildIconBadge() {
+  Widget _buildIconBadge({required bool isCompactHeight}) {
     return Row(
       children: [
         Container(
-          width: 52,
-          height: 52,
+          width: isCompactHeight ? 40 : 52,
+          height: isCompactHeight ? 40 : 52,
           decoration: BoxDecoration(
             color: AppTheme.sand,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(isCompactHeight ? 14 : 18),
           ),
           child: Center(
             child: Text(
               'B',
               style: GoogleFonts.outfit(
-                fontSize: 28,
+                fontSize: isCompactHeight ? 23 : 28,
                 height: 1,
                 fontWeight: FontWeight.w900,
                 color: AppTheme.forest,
@@ -263,9 +319,12 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: isCompactHeight ? 8 : 12),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          padding: EdgeInsets.symmetric(
+            horizontal: isCompactHeight ? 10 : 12,
+            vertical: isCompactHeight ? 5 : 7,
+          ),
           decoration: BoxDecoration(
             color: Colors.white.withAlpha(20),
             borderRadius: AppTheme.radiusPill,
@@ -278,14 +337,14 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
             children: [
               Icon(
                 Icons.wb_sunny_rounded,
-                size: 15,
+                size: isCompactHeight ? 13 : 15,
                 color: AppTheme.sand.withAlpha(230),
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: isCompactHeight ? 5 : 6),
               Text(
                 'Novo dia',
                 style: GoogleFonts.outfit(
-                  fontSize: 12,
+                  fontSize: isCompactHeight ? 11 : 12,
                   fontWeight: FontWeight.w800,
                   color: AppTheme.sand,
                 ),
@@ -297,39 +356,43 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
     );
   }
 
-  Widget _buildTaglineAndCta() {
+  Widget _buildTaglineAndCta({required bool isCompactHeight}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Clube exclusivo Borghetto',
           style: GoogleFonts.outfit(
-            fontSize: 15,
+            fontSize: isCompactHeight ? 13 : 15,
             fontWeight: FontWeight.w800,
             color: AppTheme.forest,
-            height: 1.35,
+            height: 1.25,
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: isCompactHeight ? 4 : 6),
         Text(
           'Entre, acompanhe seus dados e acesse a loja com praticidade.',
+          maxLines: isCompactHeight ? 1 : 2,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.outfit(
-            fontSize: 14,
+            fontSize: isCompactHeight ? 12 : 14,
             fontWeight: FontWeight.w500,
             color: AppTheme.mutedText,
-            height: 1.35,
+            height: 1.25,
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: isCompactHeight ? 12 : 20),
         SizedBox(
           width: double.infinity,
-          height: 54,
+          height: isCompactHeight ? 46 : 54,
           child: ElevatedButton(
             onPressed: widget.onGetStarted,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.forest,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: EdgeInsets.symmetric(
+                vertical: isCompactHeight ? 12 : 16,
+              ),
               shape: RoundedRectangleBorder(
                 borderRadius: AppTheme.radiusPill,
               ),
@@ -338,7 +401,7 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
             child: Text(
               'Começar',
               style: GoogleFonts.outfit(
-                fontSize: 14,
+                fontSize: isCompactHeight ? 13 : 14,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.4,
                 color: Colors.white,
@@ -355,15 +418,20 @@ class _FeaturePill extends StatelessWidget {
   const _FeaturePill({
     required this.icon,
     required this.label,
+    required this.compact,
   });
 
   final IconData icon;
   final String label;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 9 : 11,
+        vertical: compact ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(18),
         borderRadius: AppTheme.radiusPill,
@@ -376,14 +444,14 @@ class _FeaturePill extends StatelessWidget {
         children: [
           Icon(
             icon,
-            size: 15,
+            size: compact ? 13 : 15,
             color: AppTheme.sand,
           ),
-          const SizedBox(width: 6),
+          SizedBox(width: compact ? 5 : 6),
           Text(
             label,
             style: GoogleFonts.outfit(
-              fontSize: 12,
+              fontSize: compact ? 11 : 12,
               fontWeight: FontWeight.w800,
               color: AppTheme.sand,
             ),

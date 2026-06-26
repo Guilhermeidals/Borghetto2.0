@@ -8,6 +8,8 @@ import '../presentation/digital_membership_card_screen/digital_membership_card_s
 import '../presentation/home_screen/home_screen.dart';
 import '../presentation/profile_screen/profile_screen.dart';
 import '../presentation/sign_up_login_screen/sign_up_login_screen.dart';
+import '../features/admin/screens/admin_users_screen.dart';
+import '../features/admin/screens/admin_user_detail_screen.dart';
 import '../widgets/app_scaffold.dart';
 
 class AppRoutes {
@@ -19,6 +21,8 @@ class AppRoutes {
   static const String profileScreen = '/profile-screen';
   static const String accessLogScreen = '/access-log-screen';
   static const String dependentsScreen = '/dependents';
+  static const String adminUsersScreen = '/admin-users';
+  static const String adminUserDetailScreen = '/admin-user-detail';
 }
 
 final GoRouter appRouter = GoRouter(
@@ -94,6 +98,7 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -103,6 +108,7 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -112,12 +118,55 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
+
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.adminUsersScreen,
+              pageBuilder: (context, state) =>
+                  const NoTransitionPage(child: AdminUsersScreen()),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  pageBuilder: (context, state) {
+                    final userId = int.tryParse(
+                      state.pathParameters['id'] ?? '',
+                    );
+
+                    if (userId == null || userId <= 0) {
+                      return const NoTransitionPage(
+                        child: AdminUsersScreen(),
+                      );
+                    }
+
+                    return NoTransitionPage(
+                      child: AdminUserDetailScreen(
+                        userId: userId,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+
         StatefulShellBranch(
           routes: [
             GoRoute(
               path: AppRoutes.profileScreen,
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: ProfileScreen()),
+              pageBuilder: (context, state) {
+                final extra = state.extra;
+
+                final openPhotoPicker = extra is Map<String, dynamic> &&
+                    extra['openPhotoPicker'] == true;
+
+                return NoTransitionPage(
+                  child: ProfileScreen(
+                    openPhotoPicker: openPhotoPicker,
+                  ),
+                );
+              },
             ),
             GoRoute(
               path: AppRoutes.dependentsScreen,
