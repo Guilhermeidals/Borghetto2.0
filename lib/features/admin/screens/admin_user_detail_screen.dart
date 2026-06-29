@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/api/api_client.dart';
@@ -19,14 +21,59 @@ class AdminUserDetailScreen extends StatefulWidget {
 }
 
 class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _cpfController = TextEditingController();
+  final TextEditingController _birthDateController = TextEditingController();
+
+  final TextEditingController _zipCodeController = TextEditingController();
+  final TextEditingController _streetController = TextEditingController();
+  final TextEditingController _numberController = TextEditingController();
+  final TextEditingController _complementController = TextEditingController();
+  final TextEditingController _neighborhoodController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _stateController = TextEditingController();
   AdminUserDetail? _detail;
+
   bool _isLoading = true;
+  bool _isSaving = false;
+  bool _isEditing = false;
+  bool _isUpdatingApproval = false;
+
   String? _errorMessage;
+
+  Color get _readOnlyFieldColor => const Color(0xFFFAF7F2);
+  Color get _readOnlyBorderColor => const Color(0xFFE6D8C8);
+  Color get _readOnlyIconColor => const Color(0xFF9B7A5F);
+
+  Color get _editingFieldColor => const Color(0xFFECE1D2);
+  Color get _editingBorderColor => const Color(0xFFD8C5AD);
+  Color get _editingIconColor => const Color(0xFF946B47);
 
   @override
   void initState() {
     super.initState();
     _loadDetail();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _cpfController.dispose();
+    _birthDateController.dispose();
+
+    _zipCodeController.dispose();
+    _streetController.dispose();
+    _numberController.dispose();
+    _complementController.dispose();
+    _neighborhoodController.dispose();
+    _cityController.dispose();
+    _stateController.dispose();
+
+    super.dispose();
   }
 
   Future<void> _loadDetail() async {
@@ -43,6 +90,8 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
       if (!mounted) {
         return;
       }
+
+      _fillControllers(detail);
 
       setState(() {
         _detail = detail;
@@ -69,6 +118,206 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     }
   }
 
+  void _fillControllers(AdminUserDetail detail) {
+    final user = detail.user;
+
+    _nameController.text = user.name;
+    _emailController.text = user.email;
+    _phoneController.text = _formatPhone(user.phone);
+    _cpfController.text = _formatCpf(user.cpf);
+    _birthDateController.text = _formatDate(user.birthDate);
+
+    _zipCodeController.text = _formatZipCode(user.zipCode);
+    _streetController.text = _fallback(user.street);
+    _numberController.text = _fallback(user.number) == '-' ? '' : _fallback(user.number);
+    _complementController.text =
+        _fallback(user.complement) == '-' ? '' : _fallback(user.complement);
+    _neighborhoodController.text =
+        _fallback(user.neighborhood) == '-' ? '' : _fallback(user.neighborhood);
+    _cityController.text = _fallback(user.city) == '-' ? '' : _fallback(user.city);
+    _stateController.text = _fallback(user.state) == '-' ? '' : _fallback(user.state);
+  }
+
+  Future<void> _toggleApproval(bool approved) async {
+    setState(() {
+      _isUpdatingApproval = true;
+    });
+
+    try {
+      await ApiClient.instance.updateAdminUserApproval(
+        userId: widget.userId,
+        approved: approved,
+        reviewNote: approved ? null : 'Bloqueio manual pelo administrador',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _showSnackBar(
+        approved ? 'Usuário ativado.' : 'Usuário desativado.',
+      );
+
+      await _loadDetail();
+    } on ApiException catch (e) {
+      _showSnackBar(e.message, isError: true);
+    } catch (_) {
+      _showSnackBar(
+        'Erro inesperado ao alterar status do usuário.',
+        isError: true,
+      );
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isUpdatingApproval = false;
+      });
+    }
+  }
+
+    Future<void> _saveUser() async {
+      final name = _nameController.text.trim();
+      final email = _emailController.text.trim();
+      final phone = _onlyDigits(_phoneController.text);
+      final cpf = _onlyDigits(_cpfController.text);
+      final birthDate = _birthDateToApi(_birthDateController.text);
+      final zipCode = _onlyDigits(_zipCodeController.text);
+      final street = _streetController.text.trim();
+      final number = _numberController.text.trim();
+      final complement = _complementController.text.trim();
+      final neighborhood = _neighborhoodController.text.trim();
+      final city = _cityController.text.trim();
+      final state = _stateController.text.trim().toUpperCase();
+
+      if (name.isEmpty) {
+        _showSnackBar('Informe o nome do usuário.', isError: true);
+        return;
+      }
+
+      if (email.isEmpty || !email.contains('@')) {
+        _showSnackBar('Informe um e-mail válido.', isError: true);
+        return;
+      }
+
+      if (phone.isEmpty) {
+        _showSnackBar('Telefone não pode ficar em branco.', isError: true);
+        return;
+      }
+
+      if (!RegExp(r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$').hasMatch(phone)) {
+        _showSnackBar(
+          'Telefone inválido. Informe DDD + telefone. Ex: 51999999999',
+          isError: true,
+        );
+        return;
+      }
+
+      if (cpf.length != 11 || !_isValidCpf(cpf)) {
+        _showSnackBar('Informe um CPF válido.', isError: true);
+        return;
+      }
+
+      if (birthDate == null) {
+        _showSnackBar('Informe uma data de nascimento válida.', isError: true);
+        return;
+      }
+
+      if (zipCode.isNotEmpty && zipCode.length != 8) {
+        _showSnackBar('Informe um CEP válido.', isError: true);
+        return;
+      }
+
+      if (state.isNotEmpty && state.length != 2) {
+        _showSnackBar('Informe a UF com 2 letras.', isError: true);
+        return;
+      }
+
+      setState(() {
+        _isSaving = true;
+      });
+
+      try {
+        await ApiClient.instance.updateAdminUser(
+          userId: widget.userId,
+          name: name,
+          email: email,
+          phone: phone,
+          cpf: cpf,
+          birthDate: birthDate,
+          zipCode: zipCode.isEmpty ? null : zipCode,
+          street: street.isEmpty ? null : street,
+          number: number.isEmpty ? null : number,
+          complement: complement.isEmpty ? null : complement,
+          neighborhood: neighborhood.isEmpty ? null : neighborhood,
+          city: city.isEmpty ? null : city,
+          state: state.isEmpty ? null : state,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _isEditing = false;
+        });
+
+        _showSnackBar('Usuário atualizado.');
+
+        await _loadDetail();
+      } on ApiException catch (e) {
+        _showSnackBar(e.message, isError: true);
+      } catch (_) {
+        _showSnackBar(
+          'Erro inesperado ao salvar usuário.',
+          isError: true,
+        );
+      } finally {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+
+  void _cancelEdit() {
+    final detail = _detail;
+
+    if (detail != null) {
+      _fillControllers(detail);
+    }
+
+    setState(() {
+      _isEditing = false;
+    });
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.outfit(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: isError ? AppTheme.error : AppTheme.primary,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final detail = _detail;
@@ -86,6 +335,27 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         backgroundColor: AppTheme.backgroundLight,
         elevation: 0,
         foregroundColor: AppTheme.darkText,
+        actions: [
+          if (!_isLoading && _errorMessage == null && detail != null)
+            IconButton(
+              tooltip: _isEditing ? 'Cancelar edição' : 'Editar usuário',
+              onPressed: _isSaving || _isUpdatingApproval
+                  ? null
+                  : () {
+                      if (_isEditing) {
+                        _cancelEdit();
+                        return;
+                      }
+
+                      setState(() {
+                        _isEditing = true;
+                      });
+                    },
+              icon: Icon(
+                _isEditing ? Icons.close_rounded : Icons.edit_rounded,
+              ),
+            ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadDetail,
@@ -133,73 +403,231 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
           title: 'Dados cadastrais',
           children: [
             _InfoRow(label: 'ID interno', value: user.id.toString()),
-            _InfoRow(label: 'Nome', value: user.name),
-            _InfoRow(label: 'E-mail', value: user.email),
-            _InfoRow(label: 'CPF', value: _fallback(user.cpf)),
-            _InfoRow(label: 'Telefone', value: _fallback(user.phone)),
-            _InfoRow(
-              label: 'Nascimento',
-              value: _formatDate(user.birthDate),
+            const SizedBox(height: 8),
+            if (_isEditing) ...[
+              _buildEditableField(
+                label: 'Nome',
+                controller: _nameController,
+                icon: Icons.person_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'E-mail',
+                controller: _emailController,
+                icon: Icons.email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Telefone',
+                controller: _phoneController,
+                icon: Icons.phone_rounded,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [
+                  _PhoneInputFormatter(),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'CPF',
+                controller: _cpfController,
+                icon: Icons.badge_rounded,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [
+                  _CpfInputFormatter(),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Nascimento',
+                controller: _birthDateController,
+                icon: Icons.cake_rounded,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [
+                  _BirthDateInputFormatter(),
+                ],
+              ),
+            ] else ...[
+              _buildReadOnlyField(
+                label: 'Nome',
+                value: user.name,
+                icon: Icons.person_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'E-mail',
+                value: user.email,
+                icon: Icons.email_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Telefone',
+                value: _formatPhone(user.phone),
+                icon: Icons.phone_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'CPF',
+                value: _formatCpf(user.cpf),
+                icon: Icons.badge_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Nascimento',
+                value: _formatDate(user.birthDate),
+                icon: Icons.cake_rounded,
+              ),
+            ],
+            const SizedBox(height: 12),
+            _buildReadOnlyField(
+              label: 'Tipo',
+              value: _fallback(user.role),
+              icon: Icons.admin_panel_settings_rounded,
             ),
-            _InfoRow(label: 'Tipo', value: _fallback(user.role)),
           ],
         ),
+        if (_isEditing) ...[
+          const SizedBox(height: 14),
+          _buildEditActions(),
+        ],
         const SizedBox(height: 14),
         _buildSectionCard(
           title: 'Endereço',
           children: [
-            _InfoRow(label: 'CEP', value: _fallback(user.zipCode)),
-            _InfoRow(label: 'Rua', value: _fallback(user.street)),
-            _InfoRow(label: 'Número', value: _fallback(user.number)),
-            _InfoRow(label: 'Complemento', value: _fallback(user.complement)),
-            _InfoRow(label: 'Bairro', value: _fallback(user.neighborhood)),
-            _InfoRow(label: 'Cidade', value: _fallback(user.city)),
-            _InfoRow(label: 'UF', value: _fallback(user.state)),
+            if (_isEditing) ...[
+              _buildEditableField(
+                label: 'CEP',
+                controller: _zipCodeController,
+                icon: Icons.markunread_mailbox_rounded,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [
+                  _ZipCodeInputFormatter(),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Rua',
+                controller: _streetController,
+                icon: Icons.route_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Número',
+                controller: _numberController,
+                icon: Icons.pin_rounded,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Complemento',
+                controller: _complementController,
+                icon: Icons.home_work_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Bairro',
+                controller: _neighborhoodController,
+                icon: Icons.location_city_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'Cidade',
+                controller: _cityController,
+                icon: Icons.location_on_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 12),
+              _buildEditableField(
+                label: 'UF',
+                controller: _stateController,
+                icon: Icons.map_rounded,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(2),
+                ],
+              ),
+            ] else ...[
+              _buildReadOnlyField(
+                label: 'CEP',
+                value: _formatZipCode(user.zipCode),
+                icon: Icons.markunread_mailbox_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Rua',
+                value: _fallback(user.street),
+                icon: Icons.route_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Número',
+                value: _fallback(user.number),
+                icon: Icons.pin_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Complemento',
+                value: _fallback(user.complement),
+                icon: Icons.home_work_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Bairro',
+                value: _fallback(user.neighborhood),
+                icon: Icons.location_city_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'Cidade',
+                value: _fallback(user.city),
+                icon: Icons.location_on_rounded,
+              ),
+              const SizedBox(height: 12),
+              _buildReadOnlyField(
+                label: 'UF',
+                value: _fallback(user.state),
+                icon: Icons.map_rounded,
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 14),
-        _buildSectionCard(
-          title: 'Status e aprovação',
-          children: [
-            _InfoRow(
-              label: 'Ativo',
-              value: user.active == true ? 'Sim' : 'Não',
-            ),
-            _InfoRow(
-              label: 'Aprovado',
-              value: user.approved ? 'Sim' : 'Não',
-            ),
-            _InfoRow(
-              label: 'Status aprovação',
-              value: _translateApprovalStatus(user.approvalStatus),
-            ),
-            _InfoRow(
-              label: 'Nota revisão',
-              value: _fallback(user.reviewNote),
-            ),
-            _InfoRow(
-              label: 'Revisado em',
-              value: _formatDateTime(user.reviewedAt),
-            ),
-            _InfoRow(
-              label: 'Revisado por ID',
-              value: user.reviewedBy?.toString() ?? '-',
-            ),
-          ],
-        ),
+        _buildApprovalCard(detail),
         const SizedBox(height: 14),
         _buildSectionCard(
           title: 'Control iD',
           children: [
-            _InfoRow(
+            _buildReadOnlyField(
               label: 'ID Control iD',
               value: user.controlIdUserId?.toString() ?? '-',
+              icon: Icons.fingerprint_rounded,
             ),
-            _InfoRow(
+            const SizedBox(height: 12),
+            _buildReadOnlyField(
               label: 'Vinculado',
               value: user.controlIdUserId != null && user.controlIdUserId! > 0
                   ? 'Sim'
                   : 'Não',
+              icon: Icons.link_rounded,
+            ),
+            const SizedBox(height: 12),
+            _buildReadOnlyField(
+              label: 'Foto facial',
+              value: user.controlIdUserId != null && user.controlIdUserId! > 0
+                  ? 'Enviada'
+                  : 'Sem foto',
+              icon: Icons.face_retouching_natural_rounded,
             ),
           ],
         ),
@@ -211,6 +639,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
 
   Widget _buildHeaderCard(AdminUserDetail detail) {
     final user = detail.user;
+    final hasFacial = user.controlIdUserId != null && user.controlIdUserId! > 0;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -231,7 +660,9 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
             radius: 28,
             backgroundColor: Colors.white.withAlpha(40),
             child: Text(
-              user.name.isNotEmpty ? user.name.characters.first.toUpperCase() : '?',
+              user.name.isNotEmpty
+                  ? user.name.characters.first.toUpperCase()
+                  : '?',
               style: GoogleFonts.outfit(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -276,6 +707,16 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                       textColor: Colors.white,
                     ),
                     _StatusChip(
+                      label: user.approved ? 'Ativo' : 'Inativo',
+                      backgroundColor: Colors.white.withAlpha(32),
+                      textColor: Colors.white,
+                    ),
+                    _StatusChip(
+                      label: hasFacial ? 'Com foto' : 'Sem foto',
+                      backgroundColor: Colors.white.withAlpha(32),
+                      textColor: Colors.white,
+                    ),
+                    _StatusChip(
                       label: '${detail.dependents.length} dependente(s)',
                       backgroundColor: Colors.white.withAlpha(32),
                       textColor: Colors.white,
@@ -286,6 +727,206 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildApprovalCard(AdminUserDetail detail) {
+    final user = detail.user;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle(title: 'Status'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  user.approved ? 'Usuário ativo' : 'Usuário inativo',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.darkText,
+                  ),
+                ),
+              ),
+              _isUpdatingApproval
+                  ? const SizedBox(
+                      width: 44,
+                      height: 32,
+                      child: Center(
+                        child: CupertinoActivityIndicator(),
+                      ),
+                    )
+                  : Switch.adaptive(
+                      value: user.approved,
+                      activeColor: AppTheme.success,
+                      onChanged: _isSaving ? null : _toggleApproval,
+                    ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildReadOnlyField(
+            label: 'Ativo',
+            value: user.active == true ? 'Sim' : 'Não',
+            icon: Icons.toggle_on_rounded,
+          ),
+          const SizedBox(height: 12),
+          _buildReadOnlyField(
+            label: 'Status',
+            value: _translateApprovalStatus(user.approvalStatus),
+            icon: Icons.verified_user_rounded,
+          ),
+          const SizedBox(height: 12),
+          _buildReadOnlyField(
+            label: 'Nota revisão',
+            value: _fallback(user.reviewNote),
+            icon: Icons.notes_rounded,
+          ),
+          const SizedBox(height: 12),
+          _buildReadOnlyField(
+            label: 'Revisado em',
+            value: _formatDateTime(user.reviewedAt),
+            icon: Icons.event_available_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditActions() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _isSaving ? null : _cancelEdit,
+              child: const Text('Cancelar'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _isSaving ? null : _saveUser,
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Salvar'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditableField({
+    required String label,
+    required TextEditingController controller,
+    required IconData icon,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    List<TextInputFormatter>? inputFormatters,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+  }) {
+    return TextFormField(
+      controller: controller,
+      enabled: !_isSaving,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
+      style: GoogleFonts.outfit(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.darkText,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        filled: true,
+        fillColor: _editingFieldColor,
+        prefixIcon: Icon(
+          icon,
+          color: _editingIconColor,
+        ),
+        labelStyle: GoogleFonts.outfit(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.mutedText,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(
+            color: _editingBorderColor,
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(
+            color: _editingIconColor,
+            width: 1.4,
+          ),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(
+            color: _editingBorderColor,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
+      ),
+    );
+  }
+
+ Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    return TextFormField(
+      initialValue: value,
+      enabled: false,
+      style: GoogleFonts.outfit(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: AppTheme.darkText,
+      ),
+      decoration: InputDecoration(
+        labelText: label,
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        filled: true,
+        fillColor: _readOnlyFieldColor,
+        prefixIcon: Icon(
+          icon,
+          color: _readOnlyIconColor,
+        ),
+        labelStyle: GoogleFonts.outfit(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.mutedText,
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(
+            color: _readOnlyBorderColor,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 18,
+        ),
       ),
     );
   }
@@ -347,6 +988,8 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
 
   Widget _buildDependentItem(AdminUserDependent dependent) {
     final active = dependent.active == true;
+    final hasFacial =
+        dependent.controlIdUserId != null && dependent.controlIdUserId! > 0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -385,18 +1028,32 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                   ),
                 ),
               ),
-              _StatusChip(
-                label: active ? 'Ativo' : 'Inativo',
-                backgroundColor: active
-                    ? AppTheme.success.withAlpha(22)
-                    : AppTheme.error.withAlpha(22),
-                textColor: active ? AppTheme.success : AppTheme.error,
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.end,
+                children: [
+                  _StatusChip(
+                    label: active ? 'Ativo' : 'Inativo',
+                    backgroundColor: active
+                        ? AppTheme.success.withAlpha(22)
+                        : AppTheme.error.withAlpha(22),
+                    textColor: active ? AppTheme.success : AppTheme.error,
+                  ),
+                  _StatusChip(
+                    label: hasFacial ? 'Com foto' : 'Sem foto',
+                    backgroundColor: hasFacial
+                        ? AppTheme.success.withAlpha(22)
+                        : AppTheme.warning.withAlpha(22),
+                    textColor: hasFacial ? AppTheme.success : AppTheme.warning,
+                  ),
+                ],
               ),
             ],
           ),
           const SizedBox(height: 12),
           _InfoRow(label: 'ID', value: dependent.id.toString()),
-          _InfoRow(label: 'CPF', value: _fallback(dependent.cpf)),
+          _InfoRow(label: 'CPF', value: _formatCpf(dependent.cpf)),
           _InfoRow(
             label: 'Nascimento',
             value: _formatDate(dependent.birthDate),
@@ -470,19 +1127,16 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
-      color: Colors.white,
+      color: const Color(0xFFF8F7F5),
       borderRadius: BorderRadius.circular(22),
       border: Border.all(
-        color: AppTheme.outlineLight,
+        color: const Color(0xFFE2DDD6),
       ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withAlpha(10),
-          blurRadius: 14,
-          offset: const Offset(0, 6),
-        ),
-      ],
     );
+  }
+
+  String _onlyDigits(String value) {
+    return value.replaceAll(RegExp(r'\D'), '');
   }
 
   String _fallback(String? value) {
@@ -493,6 +1147,40 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     }
 
     return clean;
+  }
+
+  String _formatCpf(String? value) {
+    final cpf = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+
+    if (cpf.length != 11) {
+      return _fallback(value);
+    }
+
+    return '${cpf.substring(0, 3)}.${cpf.substring(3, 6)}.${cpf.substring(6, 9)}-${cpf.substring(9)}';
+  }
+
+  String _formatPhone(String? value) {
+    final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+
+    if (digits.length == 11) {
+      return '(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7)}';
+    }
+
+    if (digits.length == 10) {
+      return '(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6)}';
+    }
+
+    return _fallback(value);
+  }
+
+  String _formatZipCode(String? value) {
+    final digits = value?.replaceAll(RegExp(r'\D'), '') ?? '';
+
+    if (digits.length == 8) {
+      return '${digits.substring(0, 5)}-${digits.substring(5)}';
+    }
+
+    return _fallback(value);
   }
 
   String _translateApprovalStatus(String value) {
@@ -549,8 +1237,213 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
 
     return '$day/$month/$year $hour:$minute';
   }
+
+  String? _birthDateToApi(String value) {
+    final digits = _onlyDigits(value);
+
+    if (digits.length != 8) {
+      return null;
+    }
+
+    final day = int.tryParse(digits.substring(0, 2));
+    final month = int.tryParse(digits.substring(2, 4));
+    final year = int.tryParse(digits.substring(4, 8));
+
+    if (day == null || month == null || year == null) {
+      return null;
+    }
+
+    final date = DateTime.tryParse(
+      '${year.toString().padLeft(4, '0')}-'
+      '${month.toString().padLeft(2, '0')}-'
+      '${day.toString().padLeft(2, '0')}',
+    );
+
+    if (date == null ||
+        date.day != day ||
+        date.month != month ||
+        date.year != year) {
+      return null;
+    }
+
+    return '${year.toString().padLeft(4, '0')}-'
+        '${month.toString().padLeft(2, '0')}-'
+        '${day.toString().padLeft(2, '0')}';
+  }
+
+  bool _isValidCpf(String cpf) {
+    final digits = cpf.replaceAll(RegExp(r'\D'), '');
+
+    if (digits.length != 11) {
+      return false;
+    }
+
+    if (RegExp(r'^(\d)\1{10}$').hasMatch(digits)) {
+      return false;
+    }
+
+    int calculateDigit(String base) {
+      var sum = 0;
+
+      for (var i = 0; i < base.length; i++) {
+        sum += int.parse(base[i]) * (base.length + 1 - i);
+      }
+
+      final remainder = sum % 11;
+
+      return remainder < 2 ? 0 : 11 - remainder;
+    }
+
+    final firstDigit = calculateDigit(digits.substring(0, 9));
+    final secondDigit = calculateDigit(digits.substring(0, 10));
+
+    return digits.endsWith('$firstDigit$secondDigit');
+  }
+
+}
+class _PhoneInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+
+    final limitedDigits = digits.length > 11
+        ? digits.substring(0, 11)
+        : digits;
+
+    final formatted = _format(limitedDigits);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(
+        offset: formatted.length,
+      ),
+    );
+  }
+
+  String _format(String digits) {
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 2) {
+      return '($digits';
+    }
+
+    if (digits.length <= 6) {
+      return '(${digits.substring(0, 2)}) ${digits.substring(2)}';
+    }
+
+    if (digits.length <= 10) {
+      return '(${digits.substring(0, 2)}) '
+          '${digits.substring(2, 6)}-${digits.substring(6)}';
+    }
+
+    return '(${digits.substring(0, 2)}) '
+        '${digits.substring(2, 7)}-${digits.substring(7)}';
+  }
 }
 
+class _CpfInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.length > 11 ? digits.substring(0, 11) : digits;
+    final formatted = _format(limitedDigits);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _format(String digits) {
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 3) {
+      return digits;
+    }
+
+    if (digits.length <= 6) {
+      return '${digits.substring(0, 3)}.${digits.substring(3)}';
+    }
+
+    if (digits.length <= 9) {
+      return '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6)}';
+    }
+
+    return '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}';
+  }
+}
+
+class _BirthDateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final formatted = _format(limitedDigits);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _format(String digits) {
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    if (digits.length <= 4) {
+      return '${digits.substring(0, 2)}/${digits.substring(2)}';
+    }
+
+    return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4)}';
+  }
+}
+
+class _ZipCodeInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final limitedDigits = digits.length > 8 ? digits.substring(0, 8) : digits;
+    final formatted = _format(limitedDigits);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _format(String digits) {
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.length <= 5) {
+      return digits;
+    }
+
+    return '${digits.substring(0, 5)}-${digits.substring(5)}';
+  }
+}
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.title,

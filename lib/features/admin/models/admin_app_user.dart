@@ -21,6 +21,8 @@ class AdminAppUser {
     this.reviewedAt,
     this.reviewedBy,
     this.reviewNote,
+    this.photoUrl,
+    this.dependents = const [],
   });
 
   final int id;
@@ -47,6 +49,8 @@ class AdminAppUser {
   final String? reviewedAt;
   final int? reviewedBy;
   final String? reviewNote;
+  final String? photoUrl;
+  final List<AdminAppUserDependentSummary> dependents;
 
   bool get isPending => approvalStatus == 'pending';
   bool get isApproved => approved && approvalStatus == 'approved';
@@ -55,15 +59,15 @@ class AdminAppUser {
 
   factory AdminAppUser.fromJson(Map<String, dynamic> json) {
     return AdminAppUser(
-      id: _parseInt(json['id']),
+      id: parseInt(json['id']),
       name: json['name']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       cpf: json['cpf']?.toString(),
       phone: json['phone']?.toString(),
       birthDate: (json['birthDate'] ?? json['birth_date'])?.toString(),
       role: json['role']?.toString(),
-      active: _parseBool(json['active']),
-      controlIdUserId: _parseNullableInt(
+      active: parseBool(json['active']),
+      controlIdUserId: parseNullableInt(
         json['controlIdUserId'] ?? json['control_id_user_id'],
       ),
       zipCode: json['zipCode']?.toString(),
@@ -73,58 +77,74 @@ class AdminAppUser {
       neighborhood: json['neighborhood']?.toString(),
       city: json['city']?.toString(),
       state: json['state']?.toString(),
-      approved: _parseBool(json['approved']) ?? false,
+      approved: parseBool(json['approved']) ?? false,
       approvalStatus:
           (json['approvalStatus'] ?? json['approval_status'])?.toString() ??
               'pending',
       reviewedAt: (json['reviewedAt'] ?? json['reviewed_at'])?.toString(),
-      reviewedBy: _parseNullableInt(json['reviewedBy'] ?? json['reviewed_by']),
+      reviewedBy: parseNullableInt(json['reviewedBy'] ?? json['reviewed_by']),
       reviewNote: (json['reviewNote'] ?? json['review_note'])?.toString(),
+      photoUrl: (json['photoUrl'] ?? json['photo_url'])?.toString(),
+      dependents: ((json['dependents'] as List?) ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(AdminAppUserDependentSummary.fromJson)
+        .toList(),
     );
   }
 
   AdminAppUser copyWith({
-    int? id,
-    String? name,
-    String? email,
-    String? cpf,
-    String? phone,
-    String? birthDate,
-    String? role,
-    bool? active,
-    int? controlIdUserId,
-    String? zipCode,
-    String? street,
-    String? number,
-    String? complement,
-    String? neighborhood,
-    String? city,
-    String? state,
-    bool? approved,
-    String? approvalStatus,
-    String? reviewedAt,
-    int? reviewedBy,
-    String? reviewNote,
-  }) {
-    return AdminAppUser(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      cpf: cpf ?? this.cpf,
-      phone: phone ?? this.phone,
-      birthDate: birthDate ?? this.birthDate,
-      role: role ?? this.role,
-      active: active ?? this.active,
-      controlIdUserId: controlIdUserId ?? this.controlIdUserId,
-      approved: approved ?? this.approved,
-      approvalStatus: approvalStatus ?? this.approvalStatus,
-      reviewedAt: reviewedAt ?? this.reviewedAt,
-      reviewedBy: reviewedBy ?? this.reviewedBy,
-      reviewNote: reviewNote ?? this.reviewNote,
-    );
-  }
+  int? id,
+  String? name,
+  String? email,
+  String? cpf,
+  String? phone,
+  String? birthDate,
+  String? role,
+  bool? active,
+  int? controlIdUserId,
+  String? zipCode,
+  String? street,
+  String? number,
+  String? complement,
+  String? neighborhood,
+  String? city,
+  String? state,
+  bool? approved,
+  String? approvalStatus,
+  String? reviewedAt,
+  int? reviewedBy,
+  String? reviewNote,
+  String? photoUrl,
+  List<AdminAppUserDependentSummary>? dependents,
+}) {
+  return AdminAppUser(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    email: email ?? this.email,
+    cpf: cpf ?? this.cpf,
+    phone: phone ?? this.phone,
+    birthDate: birthDate ?? this.birthDate,
+    role: role ?? this.role,
+    active: active ?? this.active,
+    controlIdUserId: controlIdUserId ?? this.controlIdUserId,
+    zipCode: zipCode ?? this.zipCode,
+    street: street ?? this.street,
+    number: number ?? this.number,
+    complement: complement ?? this.complement,
+    neighborhood: neighborhood ?? this.neighborhood,
+    city: city ?? this.city,
+    state: state ?? this.state,
+    approved: approved ?? this.approved,
+    approvalStatus: approvalStatus ?? this.approvalStatus,
+    reviewedAt: reviewedAt ?? this.reviewedAt,
+    reviewedBy: reviewedBy ?? this.reviewedBy,
+    reviewNote: reviewNote ?? this.reviewNote,
+    photoUrl: photoUrl ?? this.photoUrl,
+    dependents: dependents ?? this.dependents,
+  );
+}
 
-  static int _parseInt(dynamic value) {
+  static int parseInt(dynamic value) {
     if (value is int) {
       return value;
     }
@@ -136,7 +156,7 @@ class AdminAppUser {
     return 0;
   }
 
-  static int? _parseNullableInt(dynamic value) {
+  static int? parseNullableInt(dynamic value) {
     if (value == null) {
       return null;
     }
@@ -152,7 +172,7 @@ class AdminAppUser {
     return null;
   }
 
-  static bool? _parseBool(dynamic value) {
+  static bool? parseBool(dynamic value) {
     if (value == null) {
       return null;
     }
@@ -184,5 +204,36 @@ class AdminAppUser {
     }
 
     return null;
+  }
+}
+
+class AdminAppUserDependentSummary {
+  const AdminAppUserDependentSummary({
+    required this.id,
+    required this.name,
+    this.relationship,
+    this.active,
+    this.controlIdUserId,
+    this.photoUrl,
+  });
+
+  final int id;
+  final String name;
+  final String? relationship;
+  final bool? active;
+  final int? controlIdUserId;
+  final String? photoUrl;
+
+  factory AdminAppUserDependentSummary.fromJson(Map<String, dynamic> json) {
+    return AdminAppUserDependentSummary(
+      id: AdminAppUser.parseInt(json['id']),
+      name: json['name']?.toString() ?? '',
+      relationship: json['relationship']?.toString(),
+      active: AdminAppUser.parseBool(json['active']),
+      controlIdUserId: AdminAppUser.parseNullableInt(
+        json['controlIdUserId'] ?? json['control_id_user_id'],
+      ),
+      photoUrl: (json['photoUrl'] ?? json['photo_url'])?.toString(),
+    );
   }
 }

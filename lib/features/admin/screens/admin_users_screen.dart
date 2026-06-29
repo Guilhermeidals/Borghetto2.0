@@ -159,6 +159,55 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     }
   }
 
+  Future<void> _logoutAllUserSessions(AdminAppUser user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Derrubar sessões?'),
+          content: Text(
+            'Isso vai desconectar ${user.name} de todos os dispositivos. '
+            'Ele precisará fazer login novamente.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Derrubar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await ApiClient.instance.logoutAllUserSessions(user.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sessões de ${user.name} derrubadas com sucesso.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) {
       return;
@@ -193,6 +242,20 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       default:
         return 'Pendente';
     }
+  }
+
+  String? _absolutePhotoUrl(String? photoUrl) {
+    if (photoUrl == null || photoUrl.trim().isEmpty) {
+      return null;
+    }
+
+    final clean = photoUrl.trim();
+
+    if (clean.startsWith('http://') || clean.startsWith('https://')) {
+      return clean;
+    }
+
+    return '${ApiClient.baseUrl}$clean';
   }
 
   Color _statusColor(AdminAppUser user) {
@@ -272,6 +335,108 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPhotoAvatar({
+    required String name,
+    required String? photoUrl,
+    double radius = 23,
+  }) {
+    final absoluteUrl = _absolutePhotoUrl(photoUrl);
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppTheme.forestMist,
+      backgroundImage: absoluteUrl == null ? null : NetworkImage(absoluteUrl),
+      onBackgroundImageError: absoluteUrl == null ? null : (_, __) {},
+      child: absoluteUrl != null
+          ? null
+          : Text(
+              name.trim().isEmpty ? '?' : name.trim().substring(0, 1).toUpperCase(),
+              style: GoogleFonts.outfit(
+                fontSize: radius * 0.72,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.primary,
+              ),
+            ),
+    );
+  }
+
+  Widget _buildDependentsPreview(AdminAppUser user) {
+    final dependents = user.dependents.take(4).toList();
+    final remaining = user.dependents.length - dependents.length;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: (dependents.length * 24) + (remaining > 0 ? 32 : 0),
+          height: 30,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var i = 0; i < dependents.length; i++)
+                Positioned(
+                  left: i * 22,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.surfaceLight,
+                        width: 2,
+                      ),
+                    ),
+                    child: _buildPhotoAvatar(
+                      name: dependents[i].name,
+                      photoUrl: dependents[i].photoUrl,
+                      radius: 13,
+                    ),
+                  ),
+                ),
+              if (remaining > 0)
+                Positioned(
+                  left: dependents.length * 22,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.surfaceLight,
+                        width: 2,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: AppTheme.surfaceVariantLight,
+                      child: Text(
+                        '+$remaining',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.mutedText,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            user.dependents.length == 1
+                ? '1 dependente'
+                : '${user.dependents.length} dependentes',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.mutedText,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -357,8 +522,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          context.push('/admin-users/${user.id}');
+        onTap: () async {
+          await context.push('/admin-users/${user.id}');
+
+          if (!mounted) {
+            return;
+          }
+
+          await _loadUsers(refresh: true);
         },
         borderRadius: BorderRadius.circular(18),
         child: Ink(
@@ -372,18 +543,10 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
+              _buildPhotoAvatar(
+                name: user.name,
+                photoUrl: user.photoUrl,
                 radius: 23,
-                backgroundColor: AppTheme.forestMist,
-                child: Text(
-                  user.name.trim().isEmpty
-                      ? '?'
-                      : user.name.trim().substring(0, 1).toUpperCase(),
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.primary,
-                  ),
-                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -427,23 +590,50 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                         ),
                       ],
                     ),
+                    if (user.dependents.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _buildDependentsPreview(user),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 10),
-              isUpdating
-                  ? const SizedBox(
-                      width: 44,
-                      height: 32,
-                      child: Center(
-                        child: CupertinoActivityIndicator(),
+              SizedBox(
+                width: 52,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    isUpdating
+                        ? const SizedBox(
+                            width: 44,
+                            height: 32,
+                            child: Center(
+                              child: CupertinoActivityIndicator(),
+                            ),
+                          )
+                        : Switch.adaptive(
+                            value: user.approved,
+                            activeColor: AppTheme.success,
+                            onChanged: (value) => _toggleApproval(user, value),
+                          ),
+                    const SizedBox(height: 8),
+                    Tooltip(
+                      message: 'Derrubar sessões',
+                      child: IconButton(
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(
+                          Icons.logout_rounded,
+                          size: 21,
+                          color: AppTheme.danger,
+                        ),
+                        onPressed: isUpdating
+                            ? null
+                            : () => _logoutAllUserSessions(user),
                       ),
-                    )
-                  : Switch.adaptive(
-                      value: user.approved,
-                      activeColor: AppTheme.success,
-                      onChanged: (value) => _toggleApproval(user, value),
                     ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

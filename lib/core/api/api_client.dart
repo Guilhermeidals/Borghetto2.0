@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:dio/dio.dart';
@@ -17,6 +18,9 @@ class ApiClient {
   ApiClient._();
 
   static final ApiClient instance = ApiClient._();
+
+  VoidCallback? onSessionExpired;
+  bool _isHandlingSessionExpired = false;
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -132,6 +136,20 @@ class ApiClient {
 
   Future<String?> getToken() {
     return _storage.read(key: 'auth_token');
+  }
+
+  Future<void> _handleExpiredSession() async {
+    if (_isHandlingSessionExpired) {
+      return;
+    }
+
+    _isHandlingSessionExpired = true;
+
+    await _storage.deleteAll();
+
+    onSessionExpired?.call();
+
+    _isHandlingSessionExpired = false;
   }
 
   String resolveFileUrl(String? path) {
@@ -620,8 +638,11 @@ class ApiClient {
     final data = e.response?.data;
 
     String message = 'Erro ao comunicar com o servidor.';
+    String? code;
 
     if (data is Map<String, dynamic>) {
+      code = data['code']?.toString();
+
       message = data['message']?.toString() ??
           data['error']?.toString() ??
           message;
@@ -631,6 +652,15 @@ class ApiClient {
       message = 'Tempo limite ao conectar no servidor.';
     } else if (e.type == DioExceptionType.connectionError) {
       message = 'Não foi possível conectar ao servidor.';
+    }
+
+    if (statusCode == 401 && code == 'SESSION_EXPIRED') {
+      unawaited(_handleExpiredSession());
+
+      return ApiException(
+        'Sessão expirada. Faça login novamente.',
+        statusCode: statusCode,
+      );
     }
 
     return ApiException(message, statusCode: statusCode);
@@ -738,7 +768,61 @@ class ApiClient {
       throw ApiException('Erro ao buscar detalhes do usuário');
     }
   }
-  
+
+  Future<void> updateAdminUser({
+    required int userId,
+    required String name,
+    required String email,
+    required String phone,
+    required String cpf,
+    required String birthDate,
+    String? zipCode,
+    String? street,
+    String? number,
+    String? complement,
+    String? neighborhood,
+    String? city,
+    String? state,
+  }) async {
+    try {
+      await _dio.put(
+        '/admin/app-users/$userId',
+        data: {
+          'name': name,
+          'email': email,
+          'phone': phone,
+          'cpf': cpf,
+          'birth_date': birthDate,
+          'zip_code': zipCode,
+          'street': street,
+          'number': number,
+          'complement': complement,
+          'neighborhood': neighborhood,
+          'city': city,
+          'state': state,
+        },
+      );
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao atualizar usuário');
+    }
+  }
+
+  Future<void> logoutAllUserSessions(int userId) async {
+    try {
+      await _dio.post('/admin/app-users/$userId/logout-all');
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException('Erro ao derrubar sessões do usuário');
+    }
+  }
+
   Future<Uint8List> getFacialUserPhotoBytes(int facialUserId) async {
     try {
       final response = await _dio.get(

@@ -30,6 +30,7 @@ void main() async {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]),
   ]).then((value) {
     GoRouter.optionURLReflectsImperativeAPIs = true;
+    configureSessionExpiredHandler();
     runApp(MyApp());
   });
 }

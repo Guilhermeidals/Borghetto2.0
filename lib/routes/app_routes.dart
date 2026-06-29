@@ -22,7 +22,7 @@ class AppRoutes {
   static const String accessLogScreen = '/access-log-screen';
   static const String dependentsScreen = '/dependents';
   static const String adminUsersScreen = '/admin-users';
-  static const String adminUserDetailScreen = '/admin-user-detail';
+  static String adminUserDetailPath(int userId) => '/admin-users/$userId';
 }
 
 final GoRouter appRouter = GoRouter(
@@ -178,3 +178,9 @@ final GoRouter appRouter = GoRouter(
     ),
   ],
 );
+
+void configureSessionExpiredHandler() {
+  ApiClient.instance.onSessionExpired = () {
+    appRouter.go(AppRoutes.signUpLoginScreen);
+  };
+}
