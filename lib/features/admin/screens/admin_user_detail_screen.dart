@@ -1,3 +1,4 @@
+import 'package:borghetto/features/admin/models/admin_app_user.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -177,112 +178,112 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     }
   }
 
-    Future<void> _saveUser() async {
-      final name = _nameController.text.trim();
-      final email = _emailController.text.trim();
-      final phone = _onlyDigits(_phoneController.text);
-      final cpf = _onlyDigits(_cpfController.text);
-      final birthDate = _birthDateToApi(_birthDateController.text);
-      final zipCode = _onlyDigits(_zipCodeController.text);
-      final street = _streetController.text.trim();
-      final number = _numberController.text.trim();
-      final complement = _complementController.text.trim();
-      final neighborhood = _neighborhoodController.text.trim();
-      final city = _cityController.text.trim();
-      final state = _stateController.text.trim().toUpperCase();
+  Future<void> _saveUser() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final phone = _onlyDigits(_phoneController.text);
+    final cpf = _onlyDigits(_cpfController.text);
+    final birthDate = _birthDateToApi(_birthDateController.text);
+    final zipCode = _onlyDigits(_zipCodeController.text);
+    final street = _streetController.text.trim();
+    final number = _numberController.text.trim();
+    final complement = _complementController.text.trim();
+    final neighborhood = _neighborhoodController.text.trim();
+    final city = _cityController.text.trim();
+    final state = _stateController.text.trim().toUpperCase();
 
-      if (name.isEmpty) {
-        _showSnackBar('Informe o nome do usuário.', isError: true);
-        return;
-      }
+    if (name.isEmpty) {
+      _showSnackBar('Informe o nome do usuário.', isError: true);
+      return;
+    }
 
-      if (email.isEmpty || !email.contains('@')) {
-        _showSnackBar('Informe um e-mail válido.', isError: true);
-        return;
-      }
+    if (email.isEmpty || !email.contains('@')) {
+      _showSnackBar('Informe um e-mail válido.', isError: true);
+      return;
+    }
 
-      if (phone.isEmpty) {
-        _showSnackBar('Telefone não pode ficar em branco.', isError: true);
-        return;
-      }
+    if (phone.isEmpty) {
+      _showSnackBar('Telefone não pode ficar em branco.', isError: true);
+      return;
+    }
 
-      if (!RegExp(r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$').hasMatch(phone)) {
-        _showSnackBar(
-          'Telefone inválido. Informe DDD + telefone. Ex: 51999999999',
-          isError: true,
-        );
-        return;
-      }
+    if (!RegExp(r'^[1-9][0-9](9[0-9]{8}|[2-8][0-9]{7})$').hasMatch(phone)) {
+      _showSnackBar(
+        'Telefone inválido. Informe DDD + telefone. Ex: 51999999999',
+        isError: true,
+      );
+      return;
+    }
 
-      if (cpf.length != 11 || !_isValidCpf(cpf)) {
-        _showSnackBar('Informe um CPF válido.', isError: true);
-        return;
-      }
+    if (cpf.length != 11 || !_isValidCpf(cpf)) {
+      _showSnackBar('Informe um CPF válido.', isError: true);
+      return;
+    }
 
-      if (birthDate == null) {
-        _showSnackBar('Informe uma data de nascimento válida.', isError: true);
-        return;
-      }
+    if (birthDate == null) {
+      _showSnackBar('Informe uma data de nascimento válida.', isError: true);
+      return;
+    }
 
-      if (zipCode.isNotEmpty && zipCode.length != 8) {
-        _showSnackBar('Informe um CEP válido.', isError: true);
-        return;
-      }
+    if (zipCode.isNotEmpty && zipCode.length != 8) {
+      _showSnackBar('Informe um CEP válido.', isError: true);
+      return;
+    }
 
-      if (state.isNotEmpty && state.length != 2) {
-        _showSnackBar('Informe a UF com 2 letras.', isError: true);
+    if (state.isNotEmpty && state.length != 2) {
+      _showSnackBar('Informe a UF com 2 letras.', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await ApiClient.instance.updateAdminUser(
+        userId: widget.userId,
+        name: name,
+        email: email,
+        phone: phone,
+        cpf: cpf,
+        birthDate: birthDate,
+        zipCode: zipCode.isEmpty ? null : zipCode,
+        street: street.isEmpty ? null : street,
+        number: number.isEmpty ? null : number,
+        complement: complement.isEmpty ? null : complement,
+        neighborhood: neighborhood.isEmpty ? null : neighborhood,
+        city: city.isEmpty ? null : city,
+        state: state.isEmpty ? null : state,
+      );
+
+      if (!mounted) {
         return;
       }
 
       setState(() {
-        _isSaving = true;
+        _isEditing = false;
       });
 
-      try {
-        await ApiClient.instance.updateAdminUser(
-          userId: widget.userId,
-          name: name,
-          email: email,
-          phone: phone,
-          cpf: cpf,
-          birthDate: birthDate,
-          zipCode: zipCode.isEmpty ? null : zipCode,
-          street: street.isEmpty ? null : street,
-          number: number.isEmpty ? null : number,
-          complement: complement.isEmpty ? null : complement,
-          neighborhood: neighborhood.isEmpty ? null : neighborhood,
-          city: city.isEmpty ? null : city,
-          state: state.isEmpty ? null : state,
-        );
+      _showSnackBar('Usuário atualizado.');
 
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _isEditing = false;
-        });
-
-        _showSnackBar('Usuário atualizado.');
-
-        await _loadDetail();
-      } on ApiException catch (e) {
-        _showSnackBar(e.message, isError: true);
-      } catch (_) {
-        _showSnackBar(
-          'Erro inesperado ao salvar usuário.',
-          isError: true,
-        );
-      } finally {
-        if (!mounted) {
-          return;
-        }
-
-        setState(() {
-          _isSaving = false;
-        });
+      await _loadDetail();
+    } on ApiException catch (e) {
+      _showSnackBar(e.message, isError: true);
+    } catch (_) {
+      _showSnackBar(
+        'Erro inesperado ao salvar usuário.',
+        isError: true,
+      );
+    } finally {
+      if (!mounted) {
+        return;
       }
+
+      setState(() {
+        _isSaving = false;
+      });
     }
+  }
 
   void _cancelEdit() {
     final detail = _detail;
@@ -315,6 +316,98 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         ),
         backgroundColor: isError ? AppTheme.error : AppTheme.primary,
       ),
+    );
+  }
+
+  String? _buildFaceImageUrl(int? controlIdUserId) {
+    if (controlIdUserId == null || controlIdUserId <= 0) {
+      return null;
+    }
+
+    return '${ApiClient.baseUrl}/facial/users/$controlIdUserId/face';
+  }
+
+  String _initialsFromName(String name) {
+    final clean = name.trim();
+
+    if (clean.isEmpty) {
+      return '?';
+    }
+
+    final parts = clean.split(RegExp(r'\s+'));
+
+    return parts
+        .take(2)
+        .map((part) => part.characters.first.toUpperCase())
+        .join();
+  }
+
+  void _showUserPhotoDialog(AdminAppUser user) {
+    final imageUrl = _buildFaceImageUrl(user.controlIdUserId);
+
+    if (imageUrl == null) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        final size = MediaQuery.of(context).size;
+
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 22,
+            vertical: 42,
+          ),
+          backgroundColor: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Container(
+              width: size.width * 0.88,
+              height: size.height * 0.58,
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  InteractiveViewer(
+                    minScale: 1,
+                    maxScale: 4,
+                    child: Image.network(
+                      imageUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: Colors.white70,
+                            size: 72,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: IconButton.filled(
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black.withAlpha(135),
+                      ),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -656,20 +749,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: Colors.white.withAlpha(40),
-            child: Text(
-              user.name.isNotEmpty
-                  ? user.name.characters.first.toUpperCase()
-                  : '?',
-              style: GoogleFonts.outfit(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
-            ),
-          ),
+          _buildUserPhotoAvatar(user),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -724,6 +804,62 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                   ],
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserPhotoAvatar(AdminAppUser user) {
+    final imageUrl = _buildFaceImageUrl(user.controlIdUserId);
+    final hasPhoto = imageUrl != null;
+    final initials = _initialsFromName(user.name);
+
+    return GestureDetector(
+      onTap: hasPhoto ? () => _showUserPhotoDialog(user) : null,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withAlpha(35),
+              border: Border.all(
+                color: Colors.white.withAlpha(80),
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: hasPhoto
+                  ? Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Text(
+                            initials,
+                            style: GoogleFonts.outfit(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Center(
+                      child: Text(
+                        initials,
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
             ),
           ),
         ],

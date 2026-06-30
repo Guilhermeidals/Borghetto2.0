@@ -18,9 +18,12 @@ class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     this.openPhotoPicker = false,
+    this.openPhotoPickerRequestId,
+
   });
 
   final bool openPhotoPicker;
+  final int? openPhotoPickerRequestId;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -29,6 +32,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   XFile? _profilePhoto;
   final ImagePicker _picker = ImagePicker();
+  int? _lastHandledPhotoPickerRequestId;
 
   AuthSession? _session;
 
@@ -40,10 +44,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _autoPhotoPickerOpened = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadSession();
-  }
+    void initState() {
+      super.initState();
+
+      if (widget.openPhotoPicker) {
+        _lastHandledPhotoPickerRequestId = widget.openPhotoPickerRequestId;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+
+          _showPhotoOptions();
+        });
+      }
+    }
 
   void _openPhotoPickerIfRequested() {
     if (_autoPhotoPickerOpened) {
@@ -59,6 +74,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     _autoPhotoPickerOpened = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showPhotoOptions();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final requestId = widget.openPhotoPickerRequestId;
+
+    if (!widget.openPhotoPicker) {
+      return;
+    }
+
+    if (requestId == null) {
+      return;
+    }
+
+    if (_lastHandledPhotoPickerRequestId == requestId) {
+      return;
+    }
+
+    _lastHandledPhotoPickerRequestId = requestId;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {

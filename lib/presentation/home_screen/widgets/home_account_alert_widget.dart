@@ -24,7 +24,6 @@ class HomeAccountAlertWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     if (session.isApproved && !_needsPhoto) {
       return const SizedBox.shrink();
     }

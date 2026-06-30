@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadSession() async {
     AuthSession? session = await ApiClient.instance.getSavedSession();
-
     if (!mounted) {
       return;
     }
@@ -61,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       AppRoutes.profileScreen,
       extra: {
         'openPhotoPicker': true,
+        'openPhotoPickerRequestId': DateTime.now().millisecondsSinceEpoch,
       },
     );
   }

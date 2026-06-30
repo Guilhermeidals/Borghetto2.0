@@ -161,9 +161,14 @@ final GoRouter appRouter = GoRouter(
                 final openPhotoPicker = extra is Map<String, dynamic> &&
                     extra['openPhotoPicker'] == true;
 
+                final openPhotoPickerRequestId = extra is Map<String, dynamic>
+                    ? extra['openPhotoPickerRequestId'] as int?
+                    : null;
+
                 return NoTransitionPage(
                   child: ProfileScreen(
                     openPhotoPicker: openPhotoPicker,
+                    openPhotoPickerRequestId: openPhotoPickerRequestId,
                   ),
                 );
               },
