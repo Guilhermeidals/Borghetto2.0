@@ -848,12 +848,6 @@ class ApiClient {
 
       throw ApiException('Formato de foto inválido');
     } on DioException catch (e) {
-      debugPrint('ERRO API FOTO FACIAL');
-      debugPrint('URL: ${e.requestOptions.uri}');
-      debugPrint('STATUS: ${e.response?.statusCode}');
-      debugPrint('DATA: ${e.response?.data}');
-      debugPrint('MESSAGE: ${e.message}');
-
       throw ApiException(
         'Erro ao carregar foto facial: ${e.response?.statusCode ?? e.message}',
       );
@@ -861,6 +855,30 @@ class ApiClient {
       debugPrint('ERRO GERAL FOTO FACIAL: $e');
 
       throw ApiException('Erro ao carregar foto facial');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAccessLogs() async {
+    try {
+      final response = await _dio.get('/access-logs');
+
+      final data = response.data;
+      final rawLogs = data is Map ? data['access_logs'] : null;
+
+      if (rawLogs is! List) {
+        return [];
+      }
+
+      return rawLogs
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw const ApiException('Erro ao carregar histórico de acessos');
     }
   }
 

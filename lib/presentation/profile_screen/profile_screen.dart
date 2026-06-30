@@ -44,21 +44,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _autoPhotoPickerOpened = false;
 
   @override
-    void initState() {
-      super.initState();
+  void initState() {
+    super.initState();
 
-      if (widget.openPhotoPicker) {
-        _lastHandledPhotoPickerRequestId = widget.openPhotoPickerRequestId;
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-
-          _showPhotoOptions();
-        });
-      }
-    }
+    _loadSession();
+  }
 
   void _openPhotoPickerIfRequested() {
     if (_autoPhotoPickerOpened) {
