@@ -27,9 +27,7 @@ class BorghettoCard extends StatelessWidget {
         borderRadius: AppTheme.radiusLarge,
         border: Border.all(
           color: borderColor ??
-              (dark
-                  ? AppTheme.sand.withAlpha(34)
-                  : AppTheme.outlineLight),
+              (dark ? AppTheme.sand.withAlpha(34) : AppTheme.outlineLight),
         ),
         boxShadow: dark ? null : AppTheme.cardShadow,
       ),

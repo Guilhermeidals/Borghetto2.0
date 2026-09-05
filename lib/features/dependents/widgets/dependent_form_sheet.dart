@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/utils/brazilian_formatters.dart';
 import '../models/app_dependent.dart';
 
 class DependentFormSheet extends StatefulWidget {
@@ -146,7 +147,7 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                    _CpfInputFormatter(),
+                    const CpfInputFormatter(),
                   ],
                   decoration: const InputDecoration(
                     labelText: 'CPF',
@@ -160,7 +161,7 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
                       return 'Informe o CPF';
                     }
 
-                    if (!_isValidCpf(cpf)) {
+                    if (!isValidCpf(cpf)) {
                       return 'CPF inválido';
                     }
 
@@ -173,7 +174,7 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
-                    _BirthDateInputFormatter(),
+                    const BirthDateInputFormatter(),
                   ],
                   decoration: const InputDecoration(
                     labelText: 'Data de nascimento',
@@ -187,7 +188,7 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
                       return 'Informe a data de nascimento';
                     }
 
-                    if (!_isValidBrazilianDate(text)) {
+                    if (!isValidBrazilianDate(text)) {
                       return 'Data inválida';
                     }
 
@@ -196,7 +197,7 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: _relationship,
+                  initialValue: _relationship,
                   decoration: const InputDecoration(
                     labelText: 'Parentesco',
                     prefixIcon: Icon(Icons.family_restroom_rounded),
@@ -308,141 +309,12 @@ class _DependentFormSheetState extends State<DependentFormSheet> {
     );
 
     if (image == null) return;
+    if (!mounted) return;
 
     setState(() {
       _selectedFaceImage = File(image.path);
     });
   }
-}
-
-class _CpfInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    final buffer = StringBuffer();
-
-    for (var i = 0; i < digits.length && i < 11; i++) {
-      if (i == 3 || i == 6) {
-        buffer.write('.');
-      }
-
-      if (i == 9) {
-        buffer.write('-');
-      }
-
-      buffer.write(digits[i]);
-    }
-
-    final text = buffer.toString();
-
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
-
-class _BirthDateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    final buffer = StringBuffer();
-
-    for (var i = 0; i < digits.length && i < 8; i++) {
-      if (i == 2 || i == 4) {
-        buffer.write('/');
-      }
-
-      buffer.write(digits[i]);
-    }
-
-    final text = buffer.toString();
-
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
-}
-
-bool _isValidBrazilianDate(String value) {
-  final regex = RegExp(r'^(\d{2})/(\d{2})/(\d{4})$');
-
-  final match = regex.firstMatch(value);
-
-  if (match == null) {
-    return false;
-  }
-
-  final day = int.tryParse(match.group(1)!);
-  final month = int.tryParse(match.group(2)!);
-  final year = int.tryParse(match.group(3)!);
-
-  if (day == null || month == null || year == null) {
-    return false;
-  }
-
-  if (year < 1900 || year > DateTime.now().year) {
-    return false;
-  }
-
-  if (month < 1 || month > 12) {
-    return false;
-  }
-
-  final date = DateTime(year, month, day);
-
-  return date.day == day && date.month == month && date.year == year;
-}
-
-bool _isValidCpf(String cpf) {
-  final cleanCpf = cpf.replaceAll(RegExp(r'\D'), '');
-
-  if (cleanCpf.length != 11) {
-    return false;
-  }
-
-  if (RegExp(r'^(\d)\1{10}$').hasMatch(cleanCpf)) {
-    return false;
-  }
-
-  var sum = 0;
-
-  for (var i = 0; i < 9; i++) {
-    sum += int.parse(cleanCpf[i]) * (10 - i);
-  }
-
-  var firstDigit = 11 - (sum % 11);
-
-  if (firstDigit >= 10) {
-    firstDigit = 0;
-  }
-
-  if (firstDigit != int.parse(cleanCpf[9])) {
-    return false;
-  }
-
-  sum = 0;
-
-  for (var i = 0; i < 10; i++) {
-    sum += int.parse(cleanCpf[i]) * (11 - i);
-  }
-
-  var secondDigit = 11 - (sum % 11);
-
-  if (secondDigit >= 10) {
-    secondDigit = 0;
-  }
-
-  return secondDigit == int.parse(cleanCpf[10]);
 }
 
 class DependentFormResult {
@@ -500,9 +372,7 @@ class _DependentFacePickerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  selectedImage == null
-                      ? 'Foto facial'
-                      : 'Foto selecionada',
+                  selectedImage == null ? 'Foto facial' : 'Foto selecionada',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),

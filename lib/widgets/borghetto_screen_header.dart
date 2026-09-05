@@ -20,9 +20,8 @@ class BorghettoScreenHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final titleColor = light ? AppTheme.lightText : AppTheme.darkText;
-    final subtitleColor = light
-        ? AppTheme.sand.withAlpha(210)
-        : AppTheme.mutedText;
+    final subtitleColor =
+        light ? AppTheme.sand.withAlpha(210) : AppTheme.mutedText;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,

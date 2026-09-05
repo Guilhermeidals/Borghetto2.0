@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../core/api/api_client.dart';
 import '../features/dependents/screens/dependents_screen.dart';
+import '../features/marketing/screens/admin_marketing_screen.dart';
 import '../presentation/access_log_screen/access_log_screen.dart';
-import '../presentation/digital_membership_card_screen/digital_membership_card_screen.dart';
 import '../presentation/home_screen/home_screen.dart';
 import '../presentation/profile_screen/profile_screen.dart';
 import '../presentation/sign_up_login_screen/sign_up_login_screen.dart';
@@ -12,16 +12,18 @@ import '../features/admin/screens/admin_users_screen.dart';
 import '../features/admin/screens/admin_user_detail_screen.dart';
 import '../widgets/app_scaffold.dart';
 
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 class AppRoutes {
   static const String initial = '/';
   static const String signUpLoginScreen = '/sign-up-login-screen';
   static const String homeScreen = '/home-screen';
-  static const String digitalMembershipCardScreen =
-      '/digital-membership-card-screen';
   static const String profileScreen = '/profile-screen';
   static const String accessLogScreen = '/access-log-screen';
   static const String dependentsScreen = '/dependents';
   static const String adminUsersScreen = '/admin-users';
+  static const String adminMarketingScreen = '/admin-users/marketing';
   static String adminUserDetailPath(int userId) => '/admin-users/$userId';
 }
 
@@ -98,17 +100,6 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: AppRoutes.digitalMembershipCardScreen,
-              pageBuilder: (context, state) =>
-                  const NoTransitionPage(child: DigitalMembershipCardScreen()),
-            ),
-          ],
-        ),
-
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -118,7 +109,6 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -126,6 +116,12 @@ final GoRouter appRouter = GoRouter(
               pageBuilder: (context, state) =>
                   const NoTransitionPage(child: AdminUsersScreen()),
               routes: [
+                GoRoute(
+                  path: 'marketing',
+                  pageBuilder: (context, state) => const NoTransitionPage(
+                    child: AdminMarketingScreen(),
+                  ),
+                ),
                 GoRoute(
                   path: ':id',
                   pageBuilder: (context, state) {
@@ -150,7 +146,6 @@ final GoRouter appRouter = GoRouter(
             ),
           ],
         ),
-
         StatefulShellBranch(
           routes: [
             GoRoute(
@@ -187,5 +182,21 @@ final GoRouter appRouter = GoRouter(
 void configureSessionExpiredHandler() {
   ApiClient.instance.onSessionExpired = () {
     appRouter.go(AppRoutes.signUpLoginScreen);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final messenger = rootScaffoldMessengerKey.currentState;
+
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Sua sessão expirou. Entre novamente.',
+            ),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 5),
+          ),
+        );
+    });
   };
 }

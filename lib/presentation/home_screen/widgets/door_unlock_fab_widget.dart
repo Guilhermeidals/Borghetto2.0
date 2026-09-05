@@ -136,7 +136,9 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isUnlocked ? Colors.green.shade700 : AppTheme.darkText)
+                    color: (_isUnlocked
+                            ? Colors.green.shade700
+                            : AppTheme.darkText)
                         .withAlpha(77),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
@@ -159,7 +161,7 @@ class _DoorUnlockFabWidgetState extends State<DoorUnlockFabWidget>
                     Icon(
                       _isUnlocked
                           ? Icons.lock_open_rounded
-                          : Icons.face_rounded,
+                          : Icons.door_front_door_rounded,
                       color: Colors.white,
                       size: 20,
                     ),

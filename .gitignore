@@ -3,7 +3,10 @@ build/
 .packages
 .flutter-plugins
 .flutter-plugins-dependencies
-pubspec.lock
+.env
+.env.*
+env.json
+*.env.json
 .idea/
 .vscode/
 *.iml

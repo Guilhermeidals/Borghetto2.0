@@ -31,7 +31,7 @@ class CustomErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Algo deu errado",
+                  'Algo deu errado',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w500,

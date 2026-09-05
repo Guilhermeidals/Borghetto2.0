@@ -2,14 +2,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import '../../features/dependents/models/app_dependent.dart';
 import '../../features/admin/models/admin_app_user.dart';
 import '../../features/admin/models/admin_user_detail.dart';
+import '../../features/marketing/models/marketing_banner.dart';
+import '../utils/brazilian_formatters.dart';
 
 import 'api_exception.dart';
 import 'auth_session.dart';
@@ -34,7 +38,6 @@ class ApiClient {
   final Uuid _uuid = const Uuid();
 
   Map<String, String>? _cachedAuditHeaders;
-
 
   Future<String> _getOrCreateDeviceId() async {
     final savedDeviceId = await _storage.read(
@@ -80,9 +83,7 @@ class ApiClient {
     final version = packageInfo.version.trim();
     final buildNumber = packageInfo.buildNumber.trim();
 
-    final appVersion = buildNumber.isEmpty
-        ? version
-        : '$version+$buildNumber';
+    final appVersion = buildNumber.isEmpty ? version : '$version+$buildNumber';
 
     final headers = <String, String>{
       'X-Device-Id': deviceId,
@@ -120,16 +121,23 @@ class ApiClient {
             options.headers.addAll(auditHeaders);
 
             handler.next(options);
-          } catch (error, stackTrace) {
-            print(
-              'Erro ao preparar headers da requisição: '
-              '$error\n$stackTrace',
-            );
-
-            
+          } catch (_) {
             // Os dados de auditoria não devem impedir a requisição.
             handler.next(options);
           }
+        },
+        onError: (error, handler) async {
+          final statusCode = error.response?.statusCode;
+          final authorization =
+              error.requestOptions.headers['Authorization']?.toString();
+          final isAuthenticatedRequest =
+              authorization != null && authorization.isNotEmpty;
+
+          if (statusCode == 401 && isAuthenticatedRequest) {
+            await _handleExpiredSession();
+          }
+
+          handler.next(error);
         },
       ),
     );
@@ -148,8 +156,6 @@ class ApiClient {
     await _storage.deleteAll();
 
     onSessionExpired?.call();
-
-    _isHandlingSessionExpired = false;
   }
 
   String resolveFileUrl(String? path) {
@@ -181,6 +187,8 @@ class ApiClient {
   }
 
   Future<void> saveSession(AuthSession session) async {
+    _isHandlingSessionExpired = false;
+
     await _storage.write(key: 'auth_token', value: session.token);
     await _storage.write(
       key: 'auth_session',
@@ -206,7 +214,8 @@ class ApiClient {
         },
       );
 
-      final session = AuthSession.fromJson(response.data as Map<String, dynamic>);
+      final session =
+          AuthSession.fromJson(response.data as Map<String, dynamic>);
 
       if (session.token.isEmpty) {
         throw const ApiException('Servidor não retornou token de acesso.');
@@ -239,12 +248,12 @@ class ApiClient {
         '/users',
         data: {
           'name': name.trim(),
-          'cpf': _onlyDigits(cpf),
-          'phone': _onlyDigits(phone),
+          'cpf': onlyDigits(cpf),
+          'phone': onlyDigits(phone),
           'birth_date': birthDate.trim(),
           'email': email.trim(),
           'password': password,
-          'zip_code': _onlyDigits(zipCode),
+          'zip_code': onlyDigits(zipCode),
           'street': street.trim(),
           'number': number.trim(),
           'complement': complement?.trim(),
@@ -254,7 +263,8 @@ class ApiClient {
         },
       );
 
-      final session = AuthSession.fromJson(response.data as Map<String, dynamic>);
+      final session =
+          AuthSession.fromJson(response.data as Map<String, dynamic>);
 
       if (session.token.isNotEmpty) {
         await saveSession(session);
@@ -278,8 +288,8 @@ class ApiClient {
         '/users/$userId',
         data: {
           'name': name.trim(),
-          'cpf': _onlyDigits(cpf),
-          'phone': _onlyDigits(phone),
+          'cpf': onlyDigits(cpf),
+          'phone': onlyDigits(phone),
           'email': email.trim(),
         },
       );
@@ -335,7 +345,7 @@ class ApiClient {
       final response = await _dio.put(
         '/app-users/$userId/phone',
         data: {
-          'phone': _onlyDigits(phone),
+          'phone': onlyDigits(phone),
         },
       );
 
@@ -376,7 +386,7 @@ class ApiClient {
     try {
       final data = <String, dynamic>{};
 
-      final cleanPhone = phone == null ? '' : _onlyDigits(phone);
+      final cleanPhone = phone == null ? '' : onlyDigits(phone);
 
       if (cleanPhone.isNotEmpty) {
         data['phone'] = cleanPhone;
@@ -480,24 +490,23 @@ class ApiClient {
   }
 
   Future<List<AppDependent>> getDependents(int userId) async {
-  try {
-    final response = await _dio.get('/app-users/$userId/dependents');
+    try {
+      final response = await _dio.get('/app-users/$userId/dependents');
 
-    final data = response.data;
+      final data = response.data;
 
-    final rawDependents = data is Map<String, dynamic>
-        ? data['dependents']
-        : null;
+      final rawDependents =
+          data is Map<String, dynamic> ? data['dependents'] : null;
 
-    if (rawDependents is! List) {
-      return [];
-    }
+      if (rawDependents is! List) {
+        return [];
+      }
 
-    return rawDependents
-        .whereType<Map<String, dynamic>>()
-        .map(AppDependent.fromJson)
-        .toList();
-  } on DioException catch (e) {
+      return rawDependents
+          .whereType<Map<String, dynamic>>()
+          .map(AppDependent.fromJson)
+          .toList();
+    } on DioException catch (e) {
       throw _handleDioError(e);
     } catch (_) {
       throw ApiException('Erro ao buscar familiares');
@@ -629,10 +638,6 @@ class ApiClient {
     }
   }
 
-  String _onlyDigits(String value) {
-    return value.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
   ApiException _handleDioError(DioException e) {
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
@@ -643,9 +648,8 @@ class ApiClient {
     if (data is Map<String, dynamic>) {
       code = data['code']?.toString();
 
-      message = data['message']?.toString() ??
-          data['error']?.toString() ??
-          message;
+      message =
+          data['message']?.toString() ?? data['error']?.toString() ?? message;
     } else if (data is String && data.trim().isNotEmpty) {
       message = data;
     } else if (e.type == DioExceptionType.connectionTimeout) {
@@ -704,7 +708,6 @@ class ApiClient {
       throw ApiException('Erro ao buscar usuários');
     }
   }
-  
 
   Future<AdminAppUser> updateAdminUserApproval({
     required int userId,
@@ -729,9 +732,8 @@ class ApiClient {
 
       final responseData = response.data;
 
-      final rawUser = responseData is Map<String, dynamic>
-          ? responseData['user']
-          : null;
+      final rawUser =
+          responseData is Map<String, dynamic> ? responseData['user'] : null;
 
       if (rawUser is! Map<String, dynamic>) {
         throw ApiException('Resposta inválida ao atualizar aprovação');
@@ -851,9 +853,7 @@ class ApiClient {
       throw ApiException(
         'Erro ao carregar foto facial: ${e.response?.statusCode ?? e.message}',
       );
-    } catch (e) {
-      debugPrint('ERRO GERAL FOTO FACIAL: $e');
-
+    } catch (_) {
       throw ApiException('Erro ao carregar foto facial');
     }
   }
@@ -882,4 +882,157 @@ class ApiClient {
     }
   }
 
+  Future<List<MarketingBanner>> getMarketingBanners({
+    bool admin = false,
+  }) async {
+    try {
+      final response = await _dio.get(
+        admin ? '/admin/marketing/banners' : '/marketing/banners',
+      );
+      final data = response.data;
+      final rawBanners = data is List
+          ? data
+          : data is Map<String, dynamic>
+              ? data['banners']
+              : null;
+
+      if (rawBanners is! List) return [];
+
+      final banners = rawBanners
+          .whereType<Map<String, dynamic>>()
+          .map(MarketingBanner.fromJson)
+          .where((banner) => banner.id > 0 && banner.imageUrl.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+      return banners;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } catch (_) {
+      throw const ApiException('Erro ao carregar campanhas.');
+    }
+  }
+
+  Future<MarketingBanner> createMarketingBanner({
+    required XFile imageFile,
+    String? title,
+  }) async {
+    try {
+      final imageBytes = await imageFile.readAsBytes();
+
+      if (imageBytes.length > 8 * 1024 * 1024) {
+        throw const ApiException('A imagem deve ter no máximo 8 MB.');
+      }
+
+      final formData = FormData.fromMap({
+        'image': MultipartFile.fromBytes(
+          imageBytes,
+          filename: imageFile.name,
+          contentType: _marketingImageMediaType(imageFile),
+        ),
+        if (title?.trim().isNotEmpty == true) 'title': title!.trim(),
+      });
+      final response = await _dio.post(
+        '/admin/marketing/banners',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = response.data;
+      final rawBanner =
+          data is Map<String, dynamic> && data['banner'] is Map<String, dynamic>
+              ? data['banner'] as Map<String, dynamic>
+              : data;
+
+      if (rawBanner is! Map<String, dynamic>) {
+        throw const ApiException('Resposta inválida ao criar campanha.');
+      }
+      return MarketingBanner.fromJson(rawBanner);
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw const ApiException('Erro ao enviar campanha.');
+    }
+  }
+
+  MediaType _marketingImageMediaType(XFile imageFile) {
+    final path = imageFile.name.toLowerCase();
+    if (path.endsWith('.png')) return MediaType('image', 'png');
+    if (path.endsWith('.webp')) return MediaType('image', 'webp');
+    return MediaType('image', 'jpeg');
+  }
+
+  Future<void> updateMarketingBanner({
+    required int bannerId,
+    required bool active,
+  }) async {
+    try {
+      await _dio.put(
+        '/admin/marketing/banners/$bannerId',
+        data: {'active': active},
+      );
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<MarketingBanner> editMarketingBanner({
+    required int bannerId,
+    required String title,
+    DateTime? startsAt,
+    DateTime? endsAt,
+  }) async {
+    try {
+      final response = await _dio.put(
+        '/admin/marketing/banners/$bannerId',
+        data: {
+          'title': title.trim(),
+          'starts_at': startsAt?.toUtc().toIso8601String(),
+          'ends_at': endsAt?.toUtc().toIso8601String(),
+        },
+      );
+      final data = response.data;
+      final rawBanner =
+          data is Map<String, dynamic> && data['banner'] is Map<String, dynamic>
+              ? data['banner'] as Map<String, dynamic>
+              : null;
+
+      if (rawBanner == null) {
+        throw const ApiException('Resposta inválida ao editar campanha.');
+      }
+
+      final updatedBanner = MarketingBanner.fromJson(rawBanner);
+
+      if ((startsAt != null && updatedBanner.startsAt == null) ||
+          (endsAt != null && updatedBanner.endsAt == null)) {
+        throw const ApiException(
+          'O servidor não confirmou a programação da campanha. Atualize o backend.',
+        );
+      }
+
+      return updatedBanner;
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<void> reorderMarketingBanners(List<int> bannerIds) async {
+    try {
+      await _dio.put(
+        '/admin/marketing/banners/order',
+        data: {'banner_ids': bannerIds},
+      );
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  Future<void> deleteMarketingBanner(int bannerId) async {
+    try {
+      await _dio.delete('/admin/marketing/banners/$bannerId');
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
 }

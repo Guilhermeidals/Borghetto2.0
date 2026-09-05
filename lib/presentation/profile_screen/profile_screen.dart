@@ -6,20 +6,21 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_session.dart';
+import '../../core/utils/brazilian_formatters.dart';
 import '../../routes/app_routes.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/utils/image_upload_helper.dart';
+import '../../features/dependents/screens/dependents_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     this.openPhotoPicker = false,
     this.openPhotoPickerRequestId,
-
   });
 
   final bool openPhotoPicker;
@@ -204,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return 'CEP não informado';
     }
 
-    final digits = _onlyDigits(zipCode);
+    final digits = onlyDigits(zipCode);
 
     if (digits.length == 8) {
       return '${digits.substring(0, 5)}-${digits.substring(5)}';
@@ -286,19 +287,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .toUpperCase();
   }
 
-  String _onlyDigits(String value) {
-    return value.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
   String _formatPhone(String value) {
-    final digits = _onlyDigits(value);
+    final digits = onlyDigits(value);
 
     if (digits.isEmpty) {
       return '';
     }
 
     if (digits.length <= 2) {
-      return '(${digits}';
+      return '($digits';
     }
 
     final ddd = digits.substring(0, 2);
@@ -351,9 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: isError
-            ? AppTheme.error
-            : const Color(0xFF2E7D52),
+        backgroundColor: isError ? AppTheme.error : const Color(0xFF2E7D52),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 3),
         shape: RoundedRectangleBorder(
@@ -496,70 +491,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _uploadProfilePhoto(XFile image) async {
-  final session = _session;
+    final session = _session;
 
-  if (session == null || session.userId <= 0) {
-    _showSnackBar(
-      'Sessão não encontrada. Faça login novamente.',
-      isError: true,
-    );
-    return;
-  }
+    if (session == null || session.userId <= 0) {
+      _showSnackBar(
+        'Sessão não encontrada. Faça login novamente.',
+        isError: true,
+      );
+      return;
+    }
 
-  final facialUserId = session.controlIdUserId;
+    final facialUserId = session.controlIdUserId;
 
-  if (facialUserId == null || facialUserId <= 0) {
-    _showSnackBar(
-      'Usuário ainda não possui ID facial vinculado.',
-      isError: true,
-    );
-    return;
-  }
+    if (facialUserId == null || facialUserId <= 0) {
+      _showSnackBar(
+        'Usuário ainda não possui ID facial vinculado.',
+        isError: true,
+      );
+      return;
+    }
 
-  if (kIsWeb) {
-    _showSnackBar(
-      'Envio de foto pela Web ainda não está habilitado.',
-      isError: true,
-    );
-    return;
-  }
-
-  setState(() {
-    _isUploadingPhoto = true;
-  });
-
-  try {
-    final preparedImage = await ImageUploadHelper.prepareXFileForUpload(image);
-
-    final updatedSession = await ApiClient.instance.uploadSelfie(
-      facialUserId: facialUserId,
-      imageFile: preparedImage,
-    );
-
-    if (!mounted) return;
+    if (kIsWeb) {
+      _showSnackBar(
+        'Envio de foto pela Web ainda não está habilitado.',
+        isError: true,
+      );
+      return;
+    }
 
     setState(() {
-      _session = updatedSession;
-      _profilePhoto = null;
-      _photoVersion = DateTime.now().millisecondsSinceEpoch;
+      _isUploadingPhoto = true;
     });
 
-    _showSnackBar('Foto enviada com sucesso.');
-  } on ApiException catch (e) {
-    _showSnackBar(e.message, isError: true);
-  } catch (_) {
-    _showSnackBar(
-      'Erro inesperado ao enviar a foto.',
-      isError: true,
-    );
-  } finally {
-    if (mounted) {
+    try {
+      final preparedImage =
+          await ImageUploadHelper.prepareXFileForUpload(image);
+
+      final updatedSession = await ApiClient.instance.uploadSelfie(
+        facialUserId: facialUserId,
+        imageFile: preparedImage,
+      );
+
+      if (!mounted) return;
+
       setState(() {
-        _isUploadingPhoto = false;
+        _session = updatedSession;
+        _profilePhoto = null;
+        _photoVersion = DateTime.now().millisecondsSinceEpoch;
       });
+
+      _showSnackBar('Foto enviada com sucesso.');
+    } on ApiException catch (e) {
+      _showSnackBar(e.message, isError: true);
+    } catch (_) {
+      _showSnackBar(
+        'Erro inesperado ao enviar a foto.',
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
     }
   }
-}
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showDialog<bool>(
@@ -593,7 +589,318 @@ class _ProfileScreenState extends State<ProfileScreen> {
     context.go(AppRoutes.signUpLoginScreen);
   }
 
-  Future<void> _showEditProfileDialog() async {
+  Future<void> _openWhatsAppSupport() async {
+    final uri = Uri.parse(
+      'https://wa.me/555121659555?text=${Uri.encodeComponent('Olá! Preciso de ajuda com o aplicativo Borghetto.')}',
+    );
+
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (opened || !mounted) return;
+
+      _showSnackBar(
+        'Não foi possível abrir o WhatsApp.',
+        isError: true,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      _showSnackBar(
+        'Não foi possível abrir o WhatsApp.',
+        isError: true,
+      );
+    }
+  }
+
+  Future<void> _showHelpAndSupport([BuildContext? presentationContext]) async {
+    await showDialog<void>(
+      context: presentationContext ?? context,
+      barrierColor: Colors.black.withAlpha(90),
+      builder: (sheetContext) {
+        Widget supportItem({
+          required IconData icon,
+          required String title,
+          required String description,
+          VoidCallback? onTap,
+        }) {
+          return InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceVariantLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, size: 20, color: AppTheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.darkText,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          description,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            height: 1.4,
+                            color: AppTheme.mutedText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.open_in_new_rounded,
+                      size: 18,
+                      color: AppTheme.mutedText,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Dialog(
+          alignment: Alignment.centerRight,
+          insetPadding: EdgeInsets.zero,
+          backgroundColor: AppTheme.surfaceLight,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.horizontal(left: Radius.circular(24)),
+          ),
+          child: FractionallySizedBox(
+            widthFactor: 0.5,
+            heightFactor: 1,
+            alignment: Alignment.centerRight,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  12,
+                  24,
+                  24 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.outlineLight,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Ajuda e suporte',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Encontre respostas rápidas e saiba onde pedir ajuda.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        color: AppTheme.mutedText,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Contato',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    supportItem(
+                      icon: Icons.chat_outlined,
+                      title: 'Atendimento remoto',
+                      description: 'Falar pelo WhatsApp',
+                      onTap: _openWhatsAppSupport,
+                    ),
+                    supportItem(
+                      icon: Icons.storefront_outlined,
+                      title: 'Atendimento presencial',
+                      description:
+                          'Procure a equipe do Mercado Borghetto para suporte com cadastro, conta e acesso.',
+                    ),
+                    supportItem(
+                      icon: Icons.location_on_outlined,
+                      title: 'Onde estamos',
+                      description:
+                          'Av. Frederico Augusto Ritter, 5255, Loja 4 — Distrito Industrial, Cachoeirinha/RS.',
+                    ),
+                    const Divider(height: 28, color: AppTheme.outlineLight),
+                    Text(
+                      'Dicas rápidas',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.darkText,
+                      ),
+                    ),
+                    supportItem(
+                      icon: Icons.face_retouching_natural_outlined,
+                      title: 'Problemas no acesso facial',
+                      description:
+                          'Confira se sua foto está atualizada e bem iluminada. Você pode enviar uma nova foto nesta tela de perfil.',
+                    ),
+                    supportItem(
+                      icon: Icons.family_restroom_rounded,
+                      title: 'Cadastro de familiares',
+                      description:
+                          'Use a opção Familiares para cadastrar e gerenciar dependentes vinculados à sua conta.',
+                    ),
+                    supportItem(
+                      icon: Icons.lock_outline_rounded,
+                      title: 'Telefone ou senha',
+                      description:
+                          'Acesse Privacidade e segurança para atualizar seu telefone ou trocar sua senha.',
+                    ),
+                    supportItem(
+                      icon: Icons.history_rounded,
+                      title: 'Histórico de acessos',
+                      description:
+                          'Veja os seus acessos e os acessos dos seus dependentes, com data, horário e status de cada entrada.',
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        child: const Text('Entendi'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAccountMenu() async {
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Fechar opções da conta',
+      barrierColor: Colors.black.withAlpha(90),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: FractionallySizedBox(
+            widthFactor: 0.5,
+            heightFactor: 1,
+            child: Material(
+              color: AppTheme.surfaceLight,
+              elevation: 16,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.horizontal(
+                  left: Radius.circular(24),
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Opções da conta',
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.darkText,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Fechar',
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                            color: AppTheme.darkText,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Gerencie seu perfil e encontre ajuda.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          color: AppTheme.mutedText,
+                        ),
+                      ),
+                      _buildMenuSection(context),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(curvedAnimation),
+          child: child,
+        );
+      },
+    );
+  }
+
+  Future<void> _showEditProfileDialog([
+    BuildContext? presentationContext,
+  ]) async {
     final session = _session;
 
     if (session == null) {
@@ -618,12 +925,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     bool obscureConfirmPassword = true;
 
     await showDialog<void>(
-      context: context,
+      context: presentationContext ?? context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             return AlertDialog(
-              title: const Text('Editar perfil'),
+              alignment: Alignment.centerRight,
+              insetPadding: EdgeInsets.zero,
+              constraints: BoxConstraints.tightFor(
+                width: MediaQuery.sizeOf(dialogContext).width * 0.5,
+                height: MediaQuery.sizeOf(dialogContext).height,
+              ),
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.horizontal(
+                  left: Radius.circular(24),
+                ),
+              ),
+              title: const Text('Privacidade e segurança'),
               content: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -636,14 +954,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(11),
-                          _PhoneInputFormatter(),
+                          const PhoneInputFormatter(),
                         ],
                         decoration: const InputDecoration(
                           labelText: 'Telefone',
                           prefixIcon: Icon(Icons.phone_outlined),
                         ),
                         validator: (value) {
-                          final phone = _onlyDigits(value ?? '');
+                          final phone = onlyDigits(value ?? '');
 
                           if (phone.isEmpty) {
                             return 'Informe seu telefone';
@@ -837,12 +1155,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             _isSavingProfile = true;
                           });
 
-                          final newPassword =
-                              newPasswordController.text.trim();
+                          final newPassword = newPasswordController.text.trim();
 
                           final success = await _saveProfileSecurity(
                             userId: session.userId,
-                            phone: _onlyDigits(phoneController.text),
+                            phone: onlyDigits(phoneController.text),
                             currentPassword: currentPasswordController.text,
                             newPassword:
                                 newPassword.isEmpty ? null : newPassword,
@@ -855,6 +1172,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           });
 
                           if (success &&
+                              dialogContext.mounted &&
                               Navigator.of(dialogContext).canPop()) {
                             Navigator.of(dialogContext).pop();
                           }
@@ -939,9 +1257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(context)),
             SliverToBoxAdapter(child: _buildMemberCard(context)),
-            SliverToBoxAdapter(child: _buildStatsRow(context)),
             SliverToBoxAdapter(child: _buildProfileDataSection(context)),
-            SliverToBoxAdapter(child: _buildMenuSection(context)),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
@@ -964,7 +1280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           GestureDetector(
-            onTap: _showEditProfileDialog,
+            onTap: _showAccountMenu,
             child: Container(
               width: 36,
               height: 36,
@@ -1101,22 +1417,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: _showEditProfileDialog,
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceVariantLight,
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
-                child: const Icon(
-                  Icons.edit_outlined,
-                  size: 16,
-                  color: AppTheme.mutedText,
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -1173,79 +1473,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           fontWeight: FontWeight.w700,
           color: Colors.white,
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              '0',
-              'Pontos',
-              Icons.stars_rounded,
-              AppTheme.accent,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              '0',
-              'Visitas',
-              Icons.storefront_outlined,
-              AppTheme.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              'R\$ 0',
-              'Economia',
-              Icons.savings_outlined,
-              const Color(0xFFE8A020),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    String value,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceLight,
-        borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(color: AppTheme.outlineLight),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.darkText,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.outfit(
-              fontSize: 11,
-              color: AppTheme.mutedText,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1380,27 +1607,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildMenuSection(BuildContext context) {
+  Widget _buildMenuSection(BuildContext panelContext) {
     final menuItems = [
       {
         'icon': Icons.family_restroom_rounded,
         'label': 'Familiares',
         'subtitle': 'Cadastre e gerencie seus dependentes',
-        'onTap': () => context.push(AppRoutes.dependentsScreen),
+        'onTap': () => showGeneralDialog<void>(
+              context: panelContext,
+              useRootNavigator: true,
+              barrierDismissible: true,
+              barrierColor: Colors.black.withAlpha(90),
+              barrierLabel: 'Fechar familiares',
+              transitionDuration: const Duration(milliseconds: 280),
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return const Align(
+                  alignment: Alignment.centerRight,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.5,
+                    heightFactor: 1,
+                    child: Material(
+                      color: AppTheme.backgroundLight,
+                      elevation: 16,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.horizontal(
+                          left: Radius.circular(24),
+                        ),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: DependentsScreen(),
+                    ),
+                  ),
+                );
+              },
+              transitionBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                final curvedAnimation = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                );
+
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(curvedAnimation),
+                  child: child,
+                );
+              },
+            ),
         'accent': false,
       },
       {
         'icon': Icons.lock_outline_rounded,
         'label': 'Privacidade e segurança',
         'subtitle': 'Senha e biometria',
-        'onTap': () {},
+        'onTap': () => _showEditProfileDialog(panelContext),
         'accent': false,
       },
       {
         'icon': Icons.help_outline_rounded,
         'label': 'Ajuda e suporte',
         'subtitle': 'Dúvidas e contato',
-        'onTap': () {},
+        'onTap': () => _showHelpAndSupport(panelContext),
         'accent': false,
       },
       {
@@ -1414,20 +1684,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.only(top: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Conta',
-            style: GoogleFonts.outfit(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.mutedText,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
           Container(
             decoration: BoxDecoration(
               color: AppTheme.surfaceLight,
@@ -1521,57 +1781,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-class _PhoneInputFormatter extends TextInputFormatter {
-  String _onlyDigits(String value) {
-    return value.replaceAll(RegExp(r'[^0-9]'), '');
-  }
-
-  String _formatPhone(String value) {
-    final digits = _onlyDigits(value);
-
-    if (digits.isEmpty) {
-      return '';
-    }
-
-    if (digits.length <= 2) {
-      return '(${digits}';
-    }
-
-    final ddd = digits.substring(0, 2);
-    final number = digits.substring(2);
-
-    if (number.length <= 4) {
-      return '($ddd) $number';
-    }
-
-    if (digits.length <= 10) {
-      final firstPart = number.substring(0, number.length - 4);
-      final lastPart = number.substring(number.length - 4);
-      return '($ddd) $firstPart-$lastPart';
-    }
-
-    final firstPart = number.substring(0, 5);
-    final lastPart = number.substring(5, 9);
-    return '($ddd) $firstPart-$lastPart';
-  }
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = _onlyDigits(newValue.text);
-    final limitedDigits =
-        digits.length > 11 ? digits.substring(0, 11) : digits;
-
-    final formatted = _formatPhone(limitedDigits);
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

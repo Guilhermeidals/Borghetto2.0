@@ -19,9 +19,8 @@ class BorghettoBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
-    final watermarkColor = dark
-        ? AppTheme.sand.withAlpha(14)
-        : AppTheme.forest.withAlpha(18);
+    final watermarkColor =
+        dark ? AppTheme.sand.withAlpha(14) : AppTheme.forest.withAlpha(18);
 
     return Container(
       decoration: BoxDecoration(

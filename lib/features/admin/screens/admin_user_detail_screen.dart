@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/utils/brazilian_formatters.dart';
 import '../../../theme/app_theme.dart';
 import '../models/admin_user_detail.dart';
 
@@ -130,13 +131,16 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
 
     _zipCodeController.text = _formatZipCode(user.zipCode);
     _streetController.text = _fallback(user.street);
-    _numberController.text = _fallback(user.number) == '-' ? '' : _fallback(user.number);
+    _numberController.text =
+        _fallback(user.number) == '-' ? '' : _fallback(user.number);
     _complementController.text =
         _fallback(user.complement) == '-' ? '' : _fallback(user.complement);
     _neighborhoodController.text =
         _fallback(user.neighborhood) == '-' ? '' : _fallback(user.neighborhood);
-    _cityController.text = _fallback(user.city) == '-' ? '' : _fallback(user.city);
-    _stateController.text = _fallback(user.state) == '-' ? '' : _fallback(user.state);
+    _cityController.text =
+        _fallback(user.city) == '-' ? '' : _fallback(user.city);
+    _stateController.text =
+        _fallback(user.state) == '-' ? '' : _fallback(user.state);
   }
 
   Future<void> _toggleApproval(bool approved) async {
@@ -168,23 +172,21 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         isError: true,
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isUpdatingApproval = false;
+        });
       }
-
-      setState(() {
-        _isUpdatingApproval = false;
-      });
     }
   }
 
   Future<void> _saveUser() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final phone = _onlyDigits(_phoneController.text);
-    final cpf = _onlyDigits(_cpfController.text);
+    final phone = onlyDigits(_phoneController.text);
+    final cpf = onlyDigits(_cpfController.text);
     final birthDate = _birthDateToApi(_birthDateController.text);
-    final zipCode = _onlyDigits(_zipCodeController.text);
+    final zipCode = onlyDigits(_zipCodeController.text);
     final street = _streetController.text.trim();
     final number = _numberController.text.trim();
     final complement = _complementController.text.trim();
@@ -215,7 +217,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
       return;
     }
 
-    if (cpf.length != 11 || !_isValidCpf(cpf)) {
+    if (cpf.length != 11 || !isValidCpf(cpf)) {
       _showSnackBar('Informe um CPF válido.', isError: true);
       return;
     }
@@ -275,13 +277,11 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         isError: true,
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
       }
-
-      setState(() {
-        _isSaving = false;
-      });
     }
   }
 
@@ -520,7 +520,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
                 inputFormatters: [
-                  _PhoneInputFormatter(),
+                  const PhoneInputFormatter(),
                 ],
               ),
               const SizedBox(height: 12),
@@ -531,7 +531,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
                 inputFormatters: [
-                  _CpfInputFormatter(),
+                  const CpfInputFormatter(),
                 ],
               ),
               const SizedBox(height: 12),
@@ -542,7 +542,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.done,
                 inputFormatters: [
-                  _BirthDateInputFormatter(),
+                  const BirthDateInputFormatter(),
                 ],
               ),
             ] else ...[
@@ -600,7 +600,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
                 inputFormatters: [
-                  _ZipCodeInputFormatter(),
+                  const ZipCodeInputFormatter(),
                 ],
               ),
               const SizedBox(height: 12),
@@ -900,7 +900,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
                     )
                   : Switch.adaptive(
                       value: user.approved,
-                      activeColor: AppTheme.success,
+                      activeThumbColor: AppTheme.success,
                       onChanged: _isSaving ? null : _toggleApproval,
                     ),
             ],
@@ -1026,7 +1026,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     );
   }
 
- Widget _buildReadOnlyField({
+  Widget _buildReadOnlyField({
     required String label,
     required String value,
     required IconData icon,
@@ -1271,10 +1271,6 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
     );
   }
 
-  String _onlyDigits(String value) {
-    return value.replaceAll(RegExp(r'\D'), '');
-  }
-
   String _fallback(String? value) {
     final clean = value?.trim();
 
@@ -1375,7 +1371,7 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
   }
 
   String? _birthDateToApi(String value) {
-    final digits = _onlyDigits(value);
+    final digits = onlyDigits(value);
 
     if (digits.length != 8) {
       return null;
@@ -1406,180 +1402,8 @@ class _AdminUserDetailScreenState extends State<AdminUserDetailScreen> {
         '${month.toString().padLeft(2, '0')}-'
         '${day.toString().padLeft(2, '0')}';
   }
-
-  bool _isValidCpf(String cpf) {
-    final digits = cpf.replaceAll(RegExp(r'\D'), '');
-
-    if (digits.length != 11) {
-      return false;
-    }
-
-    if (RegExp(r'^(\d)\1{10}$').hasMatch(digits)) {
-      return false;
-    }
-
-    int calculateDigit(String base) {
-      var sum = 0;
-
-      for (var i = 0; i < base.length; i++) {
-        sum += int.parse(base[i]) * (base.length + 1 - i);
-      }
-
-      final remainder = sum % 11;
-
-      return remainder < 2 ? 0 : 11 - remainder;
-    }
-
-    final firstDigit = calculateDigit(digits.substring(0, 9));
-    final secondDigit = calculateDigit(digits.substring(0, 10));
-
-    return digits.endsWith('$firstDigit$secondDigit');
-  }
-
-}
-class _PhoneInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-
-    final limitedDigits = digits.length > 11
-        ? digits.substring(0, 11)
-        : digits;
-
-    final formatted = _format(limitedDigits);
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(
-        offset: formatted.length,
-      ),
-    );
-  }
-
-  String _format(String digits) {
-    if (digits.isEmpty) {
-      return '';
-    }
-
-    if (digits.length <= 2) {
-      return '($digits';
-    }
-
-    if (digits.length <= 6) {
-      return '(${digits.substring(0, 2)}) ${digits.substring(2)}';
-    }
-
-    if (digits.length <= 10) {
-      return '(${digits.substring(0, 2)}) '
-          '${digits.substring(2, 6)}-${digits.substring(6)}';
-    }
-
-    return '(${digits.substring(0, 2)}) '
-        '${digits.substring(2, 7)}-${digits.substring(7)}';
-  }
 }
 
-class _CpfInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final limitedDigits = digits.length > 11 ? digits.substring(0, 11) : digits;
-    final formatted = _format(limitedDigits);
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-
-  String _format(String digits) {
-    if (digits.isEmpty) {
-      return '';
-    }
-
-    if (digits.length <= 3) {
-      return digits;
-    }
-
-    if (digits.length <= 6) {
-      return '${digits.substring(0, 3)}.${digits.substring(3)}';
-    }
-
-    if (digits.length <= 9) {
-      return '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6)}';
-    }
-
-    return '${digits.substring(0, 3)}.${digits.substring(3, 6)}.${digits.substring(6, 9)}-${digits.substring(9)}';
-  }
-}
-
-class _BirthDateInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final limitedDigits = digits.length > 8 ? digits.substring(0, 8) : digits;
-    final formatted = _format(limitedDigits);
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-
-  String _format(String digits) {
-    if (digits.isEmpty) {
-      return '';
-    }
-
-    if (digits.length <= 2) {
-      return digits;
-    }
-
-    if (digits.length <= 4) {
-      return '${digits.substring(0, 2)}/${digits.substring(2)}';
-    }
-
-    return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4)}';
-  }
-}
-
-class _ZipCodeInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final limitedDigits = digits.length > 8 ? digits.substring(0, 8) : digits;
-    final formatted = _format(limitedDigits);
-
-    return TextEditingValue(
-      text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
-    );
-  }
-
-  String _format(String digits) {
-    if (digits.isEmpty) {
-      return '';
-    }
-
-    if (digits.length <= 5) {
-      return digits;
-    }
-
-    return '${digits.substring(0, 5)}-${digits.substring(5)}';
-  }
-}
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({
     required this.title,

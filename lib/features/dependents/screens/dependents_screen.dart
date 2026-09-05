@@ -6,7 +6,6 @@ import '../../../core/utils/image_upload_helper.dart';
 import '../models/app_dependent.dart';
 import '../widgets/dependent_form_sheet.dart';
 
-
 enum DependentFilter {
   active,
   inactive,
@@ -22,7 +21,7 @@ class DependentsScreen extends StatefulWidget {
 
 class _DependentsScreenState extends State<DependentsScreen> {
   final List<AppDependent> _dependents = [];
- 
+
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -362,66 +361,71 @@ class _DependentsScreenState extends State<DependentsScreen> {
       appBar: AppBar(
         title: const Text('Familiares'),
       ),
-        body: _isLoading
-    ? const Center(
-        child: CircularProgressIndicator(),
-      )
-    : _dependents.isEmpty
-        ? _EmptyDependentsState(
-            onAddPressed: _openCreateDependentSheet,
-          )
-        : RefreshIndicator(
-            onRefresh: _loadDependents,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              children: [
-                _DependentsHeaderCard(
-                  total: _dependents.length,
-                  active: activeDependents,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Lista de familiares',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
+          : _dependents.isEmpty
+              ? _EmptyDependentsState(
+                  onAddPressed: _openCreateDependentSheet,
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadDependents,
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                    children: [
+                      _DependentsHeaderCard(
+                        total: _dependents.length,
+                        active: activeDependents,
                       ),
-                    ),
-                    _DependentFilterDropdown(
-                      selectedFilter: _filter,
-                      label: _filterLabel,
-                      onChanged: (filter) {
-                        setState(() {
-                          _filter = filter;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (filteredDependents.isEmpty)
-                  _EmptyFilteredDependentsState(
-                    filter: _filter,
-                  )
-                else
-                  ...filteredDependents.map(
-                    (dependent) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _DependentCard(
-                          dependent: dependent,
-                          onEdit: () => _openEditDependentSheet(dependent),
-                          onRemove: () => _confirmRemoveDependent(dependent),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Lista de familiares',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ),
+                          _DependentFilterDropdown(
+                            selectedFilter: _filter,
+                            label: _filterLabel,
+                            onChanged: (filter) {
+                              setState(() {
+                                _filter = filter;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (filteredDependents.isEmpty)
+                        _EmptyFilteredDependentsState(
+                          filter: _filter,
+                        )
+                      else
+                        ...filteredDependents.map(
+                          (dependent) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _DependentCard(
+                                dependent: dependent,
+                                onEdit: () =>
+                                    _openEditDependentSheet(dependent),
+                                onRemove: () =>
+                                    _confirmRemoveDependent(dependent),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
+                    ],
                   ),
-              ],
-            ),
-          ),
+                ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isLoading || _isSaving ? null : _openCreateDependentSheet,
         icon: _isSaving
@@ -481,7 +485,7 @@ class _DependentsHeaderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '$active ativo(s) de $total cadastro(s)',
+                    '$active ativo(s)',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -630,15 +634,6 @@ class _DependentAvatar extends StatelessWidget {
     return FutureBuilder<Uint8List>(
       future: ApiClient.instance.getFacialUserPhotoBytes(controlIdUserId),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          debugPrint(
-            'ERRO FOTO DEPENDENTE => '
-            'nome=${dependent.name}, '
-            'controlIdUserId=$controlIdUserId, '
-            'erro=${snapshot.error}',
-          );
-        }
-
         if (snapshot.hasData) {
           return CircleAvatar(
             radius: 26,
@@ -722,7 +717,7 @@ class _EmptyDependentsState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Adicione cônjuge, filhos ou outros familiares para preparar o acesso deles ao clube.',
+              'Adicione cônjuge, filhos ou outros familiares para preparar o acesso deles à loja.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

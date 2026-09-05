@@ -109,7 +109,6 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
             onGetStarted: _handleGetStarted,
           ),
         ),
-
         if (_showForm) _buildFormOverlay(isTablet: false),
       ],
     );
@@ -127,7 +126,6 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
             ),
           ),
         ),
-
         if (_showForm) _buildFormOverlay(isTablet: true),
       ],
     );
@@ -159,7 +157,6 @@ class _SignUpLoginScreenState extends State<SignUpLoginScreen>
                 ),
               ),
             ),
-
             SafeArea(
               child: Center(
                 child: Padding(

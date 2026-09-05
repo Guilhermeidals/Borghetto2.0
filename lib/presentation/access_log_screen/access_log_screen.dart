@@ -33,11 +33,13 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
     _loadAccessLogs();
   }
 
-  Future<void> _loadAccessLogs() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadAccessLogs({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final logs = await ApiClient.instance.getAccessLogs();
@@ -107,7 +109,11 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
   }
 
   bool _isGrantedEvent(int? event) {
-    return event == 7 || event == 10 ||event == 11 || event == 12 || event == 15;
+    return event == 7 ||
+        event == 10 ||
+        event == 11 ||
+        event == 12 ||
+        event == 15;
   }
 
   bool _isDeniedEvent(int? event) {
@@ -259,6 +265,7 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
+            _buildSummaryTitle(),
             _buildSummaryRow(),
             _buildFilterChips(),
             Expanded(
@@ -305,9 +312,23 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
     );
   }
 
-  Widget _buildSummaryRow() {
+  Widget _buildSummaryTitle() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      child: Text(
+        'Últimos 100 acessos',
+        style: GoogleFonts.outfit(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.mutedText,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
       child: Row(
         children: [
           Expanded(
@@ -401,14 +422,12 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? AppTheme.primary
-                        : AppTheme.surfaceLight,
+                    color:
+                        isSelected ? AppTheme.primary : AppTheme.surfaceLight,
                     borderRadius: BorderRadius.circular(20.0),
                     border: Border.all(
-                      color: isSelected
-                          ? AppTheme.primary
-                          : AppTheme.outlineLight,
+                      color:
+                          isSelected ? AppTheme.primary : AppTheme.outlineLight,
                     ),
                   ),
                   child: Text(
@@ -443,7 +462,7 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
 
     return RefreshIndicator(
       color: AppTheme.primary,
-      onRefresh: _loadAccessLogs,
+      onRefresh: () => _loadAccessLogs(showLoading: false),
       child: _buildLogList(),
     );
   }
@@ -554,15 +573,12 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
     final statusBg = statusColor.withAlpha(24);
 
     final personName = log['person_name']?.toString().trim();
-    final displayName = personName == null || personName.isEmpty
-        ? 'Usuário'
-        : personName;
+    final displayName =
+        personName == null || personName.isEmpty ? 'Usuário' : personName;
 
     final personType = _formatPersonType(log['person_type']);
     final accessLabel = _formatAccessLabel(log);
     final accessTime = _formatTime(log['access_time']);
-    final controlId = log['control_id_user_id']?.toString();
-
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -783,57 +799,57 @@ class _AccessLogScreenState extends State<AccessLogScreen> {
     );
   }
 
-String _initials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .toList();
+  String _initials(String name) {
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
 
-  if (parts.isEmpty) {
-    return 'U';
+    if (parts.isEmpty) {
+      return 'U';
+    }
+
+    if (parts.length == 1) {
+      return parts.first.characters.first.toUpperCase();
+    }
+
+    return '${parts.first.characters.first}${parts.last.characters.first}'
+        .toUpperCase();
   }
 
-  if (parts.length == 1) {
-    return parts.first.characters.first.toUpperCase();
-  }
-
-  return '${parts.first.characters.first}${parts.last.characters.first}'
-      .toUpperCase();
-}
-
-Widget _logPill({
-  required IconData icon,
-  required String label,
-}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-    decoration: BoxDecoration(
-      color: AppTheme.surfaceVariantLight,
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(
-        color: AppTheme.outlineLight,
-      ),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          icon,
-          size: 13,
-          color: AppTheme.mutedText,
+  Widget _logPill({
+    required IconData icon,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceVariantLight,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: AppTheme.outlineLight,
         ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 13,
             color: AppTheme.mutedText,
           ),
-        ),
-      ],
-    ),
-  );
-}
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.mutedText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

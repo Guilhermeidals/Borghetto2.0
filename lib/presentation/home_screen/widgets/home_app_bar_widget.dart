@@ -5,14 +5,10 @@ import '../../../core/api/auth_session.dart';
 import '../../../core/app_export.dart';
 
 class HomeAppBarWidget extends StatefulWidget {
-  final VoidCallback onSearchTap;
-  final VoidCallback onCartTap;
   final VoidCallback onAvatarTap;
 
   const HomeAppBarWidget({
     super.key,
-    required this.onSearchTap,
-    required this.onCartTap,
     required this.onAvatarTap,
   });
 
@@ -151,71 +147,6 @@ class _HomeAppBarWidgetState extends State<HomeAppBarWidget> {
                     color: AppTheme.darkText,
                   ),
                   overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: widget.onSearchTap,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppTheme.outlineLight,
-                  width: 1.5,
-                ),
-                color: AppTheme.surfaceLight,
-              ),
-              child: const Center(
-                child: CustomIconWidget(
-                  iconName: 'search',
-                  color: AppTheme.darkText,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: widget.onCartTap,
-            child: Stack(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppTheme.outlineLight,
-                      width: 1.5,
-                    ),
-                    color: AppTheme.surfaceLight,
-                  ),
-                  child: const Center(
-                    child: CustomIconWidget(
-                      iconName: 'shopping_bag_outlined',
-                      color: AppTheme.darkText,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: AppTheme.error,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.backgroundLight,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
                 ),
               ],
             ),

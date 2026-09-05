@@ -189,7 +189,7 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
                 ],
               ),
               child: Text(
-                'Clube',
+                'Mercado',
                 style: GoogleFonts.outfit(
                   fontSize: isCompactHeight ? 11 : 13,
                   fontWeight: FontWeight.w900,
@@ -212,9 +212,8 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
       padding: EdgeInsets.all(isCompactHeight ? 15 : (isTablet ? 22 : 20)),
       decoration: BoxDecoration(
         color: AppTheme.forest,
-        borderRadius: isCompactHeight
-            ? AppTheme.radiusLarge
-            : AppTheme.radiusExtraLarge,
+        borderRadius:
+            isCompactHeight ? AppTheme.radiusLarge : AppTheme.radiusExtraLarge,
         boxShadow: AppTheme.premiumShadow,
       ),
       child: Stack(
@@ -258,7 +257,7 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
               ),
               SizedBox(height: isCompactHeight ? 6 : 10),
               Text(
-                'Acesso ao clube, carteirinha digital e entrada facilitada em uma experiência feita para ser leve, próxima e acolhedora.',
+                'Acesso facilitado à loja em uma experiência feita para ser leve, próxima e acolhedora.',
                 maxLines: isCompactHeight ? 1 : 4,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.outfit(
@@ -361,7 +360,7 @@ class _SplashHeroSectionWidgetState extends State<SplashHeroSectionWidget>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Clube exclusivo Borghetto',
+          'Mercado Borghetto',
           style: GoogleFonts.outfit(
             fontSize: isCompactHeight ? 13 : 15,
             fontWeight: FontWeight.w800,

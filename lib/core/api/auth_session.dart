@@ -80,20 +80,15 @@ class AuthSession {
       token: json['token']?.toString() ?? '',
       userId: _parseInt(user['id'] ?? user['userId'] ?? user['user_id']),
       name: user['name']?.toString() ?? '',
-
       email: user['email']?.toString(),
       cpf: user['cpf']?.toString(),
       phone: user['phone']?.toString(),
-
       birthDate: (user['birthDate'] ?? user['birth_date'])?.toString(),
-
       role: user['role']?.toString(),
       active: _parseBool(user['active']),
-
       controlIdUserId: _parseNullableInt(
         user['controlIdUserId'] ?? user['control_id_user_id'],
       ),
-
       zipCode: (user['zipCode'] ?? user['zip_code'])?.toString(),
       street: user['street']?.toString(),
       number: user['number']?.toString(),
@@ -101,10 +96,8 @@ class AuthSession {
       neighborhood: user['neighborhood']?.toString(),
       city: user['city']?.toString(),
       state: user['state']?.toString(),
-
       photoUrl: (user['photoUrl'] ?? user['photo_url'])?.toString(),
       accessStatus: (user['accessStatus'] ?? user['access_status'])?.toString(),
-
       approved: _parseBool(user['approved']) ?? false,
       approvalStatus:
           (user['approvalStatus'] ?? user['approval_status'])?.toString() ??
@@ -126,42 +119,31 @@ class AuthSession {
         'email': email,
         'cpf': cpf,
         'phone': phone,
-
         'birth_date': birthDate,
         'birthDate': birthDate,
-
         'role': role,
         'active': active,
-
         'control_id_user_id': controlIdUserId,
         'controlIdUserId': controlIdUserId,
-
         'zip_code': zipCode,
         'zipCode': zipCode,
-
         'street': street,
         'number': number,
         'complement': complement,
         'neighborhood': neighborhood,
         'city': city,
         'state': state,
-
         'photoUrl': photoUrl,
         'photo_url': photoUrl,
-
         'accessStatus': accessStatus,
         'access_status': accessStatus,
-
         'approved': approved,
         'approval_status': approvalStatus,
         'approvalStatus': approvalStatus,
-
         'reviewed_at': reviewedAt,
         'reviewedAt': reviewedAt,
-
         'reviewed_by': reviewedBy,
         'reviewedBy': reviewedBy,
-
         'review_note': reviewNote,
         'reviewNote': reviewNote,
       },

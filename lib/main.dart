@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
-import 'theme/app_theme.dart';
 import '../core/app_export.dart';
 import '../widgets/custom_error_widget.dart';
 
@@ -44,6 +43,7 @@ class MyApp extends StatelessWidget {
       builder: (context, orientation, screenType) {
         return MaterialApp.router(
           title: 'Borghetto',
+          scaffoldMessengerKey: rootScaffoldMessengerKey,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,

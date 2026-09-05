@@ -78,14 +78,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     } catch (_) {
       _showSnackBar('Erro inesperado ao buscar usuários.', isError: true);
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+        });
       }
-
-      setState(() {
-        _isLoading = false;
-        _isRefreshing = false;
-      });
     }
   }
 
@@ -149,13 +147,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         isError: true,
       );
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _updatingUserId = null;
+        });
       }
-
-      setState(() {
-        _updatingUserId = null;
-      });
     }
   }
 
@@ -276,7 +272,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final cpf = value?.replaceAll(RegExp(r'\D'), '') ?? '';
 
     if (cpf.length != 11) {
-      return value?.trim().isNotEmpty == true ? value!.trim() : 'CPF não informado';
+      return value?.trim().isNotEmpty == true
+          ? value!.trim()
+          : 'CPF não informado';
     }
 
     return '${cpf.substring(0, 3)}.${cpf.substring(3, 6)}.${cpf.substring(6, 9)}-${cpf.substring(9)}';
@@ -293,7 +291,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       return '(${digits.substring(0, 2)}) ${digits.substring(2, 6)}-${digits.substring(6)}';
     }
 
-    return value?.trim().isNotEmpty == true ? value!.trim() : 'Telefone não informado';
+    return value?.trim().isNotEmpty == true
+        ? value!.trim()
+        : 'Telefone não informado';
   }
 
   @override
@@ -353,7 +353,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       child: absoluteUrl != null
           ? null
           : Text(
-              name.trim().isEmpty ? '?' : name.trim().substring(0, 1).toUpperCase(),
+              name.trim().isEmpty
+                  ? '?'
+                  : name.trim().substring(0, 1).toUpperCase(),
               style: GoogleFonts.outfit(
                 fontSize: radius * 0.72,
                 fontWeight: FontWeight.w800,
@@ -464,6 +466,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.refresh_rounded),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: () => context.push('/admin-users/marketing'),
+            icon: const Icon(Icons.campaign_outlined, size: 18),
+            label: const Text('Marketing'),
           ),
         ],
       ),
@@ -613,7 +621,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           )
                         : Switch.adaptive(
                             value: user.approved,
-                            activeColor: AppTheme.success,
+                            activeThumbColor: AppTheme.success,
                             onChanged: (value) => _toggleApproval(user, value),
                           ),
                     const SizedBox(height: 8),

@@ -49,29 +49,23 @@ class _AppNavigationState extends State<AppNavigation> {
         branchIndex: 0,
       ),
       const _TabSpec(
-        label: 'Clube',
-        icon: Icons.credit_card_outlined,
-        selectedIcon: Icons.credit_card_rounded,
-        branchIndex: 1,
-      ),
-      const _TabSpec(
         label: 'Acessos',
         icon: Icons.history_outlined,
         selectedIcon: Icons.history_rounded,
-        branchIndex: 2,
+        branchIndex: 1,
       ),
       if (_isAdmin)
         const _TabSpec(
           label: 'Admin',
           icon: Icons.admin_panel_settings_outlined,
           selectedIcon: Icons.admin_panel_settings_rounded,
-          branchIndex: 3,
+          branchIndex: 2,
         ),
       const _TabSpec(
         label: 'Perfil',
         icon: Icons.person_outline_rounded,
         selectedIcon: Icons.person_rounded,
-        branchIndex: 4,
+        branchIndex: 3,
       ),
     ];
   }
@@ -180,9 +174,8 @@ class _AppNavigationState extends State<AppNavigation> {
                           isActive ? tab.selectedIcon : tab.icon,
                           key: ValueKey('${tab.label}-$isActive'),
                           size: 24,
-                          color: isActive
-                              ? AppTheme.primary
-                              : AppTheme.mutedText,
+                          color:
+                              isActive ? AppTheme.primary : AppTheme.mutedText,
                         ),
                       ),
                       const SizedBox(height: 2),

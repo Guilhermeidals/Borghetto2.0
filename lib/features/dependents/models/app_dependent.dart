@@ -58,8 +58,8 @@ class AppDependent {
       controlIdUserId: json['control_id_user_id'] == null
           ? null
           : int.tryParse(json['control_id_user_id'].toString()),
-      faceRegistered: json['face_registered'] == true ||
-          json['faceRegistered'] == true,
+      faceRegistered:
+          json['face_registered'] == true || json['faceRegistered'] == true,
     );
   }
 
@@ -106,39 +106,39 @@ class AppDependent {
   }
 }
 
-  String _formatBirthDate(dynamic value) {
-    if (value == null) {
-      return '';
-    }
+String _formatBirthDate(dynamic value) {
+  if (value == null) {
+    return '';
+  }
 
-    final text = value.toString().trim();
+  final text = value.toString().trim();
 
-    if (text.isEmpty) {
-      return '';
-    }
+  if (text.isEmpty) {
+    return '';
+  }
 
-    // Já está em PT-BR: DD/MM/AAAA
-    if (RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(text)) {
-      return text;
-    }
-
-    // ISO completo vindo do backend: 1998-01-19T00:00:00.000Z
-    final isoDate = DateTime.tryParse(text);
-
-    if (isoDate != null) {
-      final day = isoDate.day.toString().padLeft(2, '0');
-      final month = isoDate.month.toString().padLeft(2, '0');
-      final year = isoDate.year.toString().padLeft(4, '0');
-
-      return '$day/$month/$year';
-    }
-
-    // Data simples do banco: YYYY-MM-DD
-    if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(text)) {
-      final parts = text.split('-');
-
-      return '${parts[2]}/${parts[1]}/${parts[0]}';
-    }
-
+  // Já está em PT-BR: DD/MM/AAAA
+  if (RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(text)) {
     return text;
   }
+
+  // ISO completo vindo do backend: 1998-01-19T00:00:00.000Z
+  final isoDate = DateTime.tryParse(text);
+
+  if (isoDate != null) {
+    final day = isoDate.day.toString().padLeft(2, '0');
+    final month = isoDate.month.toString().padLeft(2, '0');
+    final year = isoDate.year.toString().padLeft(4, '0');
+
+    return '$day/$month/$year';
+  }
+
+  // Data simples do banco: YYYY-MM-DD
+  if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(text)) {
+    final parts = text.split('-');
+
+    return '${parts[2]}/${parts[1]}/${parts[0]}';
+  }
+
+  return text;
+}
